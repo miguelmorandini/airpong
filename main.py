@@ -25,6 +25,7 @@ def run_desktop_app():
     print("  🖱️  CLIQUE ESQUERDO: Sacar bola / Power Smash")
     print("  ✋ WEBCAM         : Mova sua mão na câmera para controlar a raquete")
     print("  [ESPAÇO]          : Sacar a bola")
+    print("  [F]               : Alternar Tela Cheia / Maximizado")
     print("  [R]               : Reiniciar partida")
     print("  [1 - 4]           : Mudar dificuldade (1:Easy, 2:Medium, 3:Hard, 4:Champ)")
     print("  [S]               : Salvar no Databricks / Local")
@@ -44,11 +45,10 @@ def run_desktop_app():
     click_swing = [False]
 
     def on_mouse_event(event, x, y, flags, param):
-        # Canvas dimensions: 800 x 560
-        # Map mouse X: [0, 800] -> world_x [-0.90, +0.90]
-        mouse_pos[0] = ((x / 800.0) - 0.5) * 1.80
-        # Map mouse Y: [0, 560] -> world_y [0.05, 0.65] (inverted)
-        mouse_pos[1] = max(0.05, min(0.65, (1.0 - (y / 560.0)) * 0.70))
+        rw = float(renderer.width)
+        rh = float(renderer.height)
+        mouse_pos[0] = ((x / rw) - 0.5) * 1.80
+        mouse_pos[1] = max(0.05, min(0.65, (1.0 - (y / rh)) * 0.70))
         mouse_last_moved[0] = time.time()
 
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -61,11 +61,22 @@ def run_desktop_app():
         cam = SyntheticCameraSource(width=640, height=480)
 
     window_name = "AI Ping Pong - Wii Sports Mode"
-    cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.setMouseCallback(window_name, on_mouse_event)
+
+    # Maximize window on startup
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            hwnd = ctypes.windll.user32.FindWindowW(None, window_name)
+            if hwnd:
+                ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
+        except Exception:
+            pass
 
     prev_time = time.time()
     prev_fist = False
+    first_frame = True
 
     try:
         while True:
@@ -197,10 +208,29 @@ def run_desktop_app():
 
             cv2.imshow(window_name, scene_frame)
 
+            # Ensure maximized window on first frame presentation
+            if first_frame:
+                first_frame = False
+                if sys.platform == "win32":
+                    try:
+                        import ctypes
+                        hwnd = ctypes.windll.user32.FindWindowW(None, window_name)
+                        if hwnd:
+                            ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
+                    except Exception:
+                        pass
+
             # 8. Keyboard handling
             key = cv2.waitKey(1) & 0xFF
             if key in (27, ord("q"), ord("Q")):
                 break
+            elif key in (ord("f"), ord("F")):
+                is_fullscreen = cv2.getWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN) == cv2.WINDOW_FULLSCREEN
+                cv2.setWindowProperty(
+                    window_name,
+                    cv2.WND_PROP_FULLSCREEN,
+                    cv2.WINDOW_NORMAL if is_fullscreen else cv2.WINDOW_FULLSCREEN,
+                )
             elif key == 32:  # Space
                 if game.status == MatchStatus.READY:
                     game.prepare_serve()

@@ -87,3 +87,63 @@ def test_ball_bounce_on_table():
     assert bounce_events[0].details == "PLAYER"
     # Velocity vy reversed (upwards)
     assert ball.vy > 0.0
+
+
+def test_player_paddle_hit_rebatida_physics():
+    """Verify calibrated return physics on player hits (no excessive float/ballooning)."""
+    engine = PhysicsEngine()
+    player_p = Paddle(is_player=True)
+    player_p.x = 0.0
+    player_p.y = 0.25
+    player_p.z = -1.40
+    player_p.vx = 1.0  # Hook forehand swing
+    player_p.vy = 0.2
+    player_p.vz = 0.5
+    ai_p = Paddle(is_player=False)
+
+    ball = Ball()
+    ball.x = 0.05
+    ball.y = 0.25
+    ball.z = -1.35
+    ball.vx = 0.0
+    ball.vy = -0.5
+    ball.vz = -3.0  # Incoming from opponent
+
+    events = engine.step(ball, player_p, ai_p, dt=0.016)
+    hit_events = [e for e in events if e.event_type == "HIT"]
+    assert len(hit_events) == 1
+    assert hit_events[0].hitter == "PLAYER"
+    assert "GANCHO" in hit_events[0].details
+
+    # Rebatida physics verification
+    assert 3.2 <= ball.vz <= 5.8       # Clean, punchy forward drive
+    assert 1.2 <= ball.vy <= 2.0       # Low, tight arc over net (no balloon lob)
+    assert -1.0 <= ball.vx <= 1.0      # Contained lateral angle
+
+
+def test_roberval_return_rebatida_physics():
+    """Verify Roberval returns with natural, playable arc towards player."""
+    engine = PhysicsEngine()
+    player_p = Paddle(is_player=True)
+    ai_p = Paddle(is_player=False)
+    ai_p.x = 0.0
+    ai_p.y = 0.25
+    ai_p.z = 1.40
+
+    ball = Ball()
+    ball.x = 0.05
+    ball.y = 0.25
+    ball.z = 1.35
+    ball.vx = 0.0
+    ball.vy = -0.5
+    ball.vz = 3.5  # Incoming from player
+
+    events = engine.step(ball, player_p, ai_p, dt=0.016)
+    hit_events = [e for e in events if e.event_type == "HIT"]
+    assert len(hit_events) == 1
+    assert hit_events[0].hitter == "ROBERVAL"
+
+    # Roberval return physics verification
+    assert -4.2 <= ball.vz <= -3.0     # Reaches player baseline
+    assert 1.4 <= ball.vy <= 2.0       # Natural table tennis arc (no moonball)
+    assert -0.8 <= ball.vx <= 0.8      # Lands on player table

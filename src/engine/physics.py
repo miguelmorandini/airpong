@@ -167,50 +167,65 @@ class PhysicsEngine:
         ball.y += ball.vy * dt
         ball.z += ball.vz * dt
 
-        # 2. Check Paddle Collisions (Hook Stroke / Gancho & Interception)
-        # Player Paddle: Hook Swing motion from hand/arm or block interception
-        if ball.vz < 0.0 and ball.z <= -1.20:
+        # 2. Check Paddle Collisions (Calibrated Wii Sports Rebatidas)
+        # Player Paddle: Hook Swing / Smash / Drive / Block Interception
+        if ball.vz < 0.0 and ball.z <= -0.75:
             dx = ball.x - player_paddle.x
             dy = ball.y - player_paddle.y
             radial_dist = math.sqrt(dx * dx + dy * dy)
             z_dist = abs(ball.z - player_paddle.z)
 
-            # Check if player performed a hook swing (movimento de gancho)
+            # Check if player performed a hook swing or smash
             swing_speed = player_paddle.speed
-            is_hook = (swing_speed >= 1.05)
+            is_hook = (swing_speed >= 0.90) or (abs(player_paddle.vx) >= 0.55)
+            is_smash = (swing_speed >= 2.8 and player_paddle.vy < -0.3) or (player_paddle.vz > 4.0) or (swing_speed >= 3.8)
+
+            # Assisted reach: 48cm for active hook swing, 40cm for block
             max_reach = 0.48 if is_hook else 0.40
 
-            # Hit connects if ball is within reach
-            if radial_dist <= max_reach and z_dist <= 0.38:
-                if is_hook:
-                    # Dynamic Hook Stroke: Transfer arm/wrist momentum
-                    if player_paddle.vy < -0.8 or swing_speed > 4.5:
-                        shot_type = "GANCHO SMASH"
-                        forward_speed = 5.4
-                        ball.vy = 1.4
-                    elif player_paddle.vx > 0.8:
+            if radial_dist <= max_reach and z_dist <= 0.42:
+                if is_smash:
+                    shot_type = "GANCHO SMASH"
+                    forward_speed = min(5.6, 4.6 + swing_speed * 0.20)
+                    vertical_lift = 1.10
+                    ball.spin_x = 12.0  # Heavy topspin
+                    ball.spin_y = (ball.x - player_paddle.x) * 8.0
+                elif is_hook:
+                    if player_paddle.vx > 0.4:
                         shot_type = "GANCHO FOREHAND"
-                        forward_speed = 3.8 + swing_speed * 0.25
-                        ball.vy = 2.4
-                        ball.spin_x = 8.0  # Topspin
-                    elif player_paddle.vx < -0.8:
+                        forward_speed = 3.7 + min(1.0, swing_speed * 0.18)
+                        vertical_lift = 1.65
+                        ball.spin_y = 6.0
+                        ball.spin_x = 6.0
+                    elif player_paddle.vx < -0.4:
                         shot_type = "GANCHO BACKHAND"
-                        forward_speed = 3.6 + swing_speed * 0.20
-                        ball.vy = 2.4
+                        forward_speed = 3.6 + min(1.0, swing_speed * 0.18)
+                        vertical_lift = 1.65
+                        ball.spin_y = -6.0
                         ball.spin_x = 6.0
                     else:
                         shot_type = "GANCHO DRIVE"
-                        forward_speed = 3.6 + swing_speed * 0.20
-                        ball.vy = 2.3
-
-                    ball.vz = forward_speed
-                    ball.vx = np.clip(0.4 * ball.vx + player_paddle.vx * 0.75 + (ball.x - player_paddle.x) * 1.5, -1.8, 1.8)
+                        forward_speed = 3.6 + min(1.0, swing_speed * 0.18)
+                        vertical_lift = 1.65
+                        ball.spin_x = 4.0
                 else:
-                    # Clean passive block
                     shot_type = "BLOQUEIO"
-                    ball.vz = 3.2
-                    ball.vy = 2.2
-                    ball.vx = np.clip(0.3 * ball.vx + (ball.x - player_paddle.x) * 2.0, -1.6, 1.6)
+                    forward_speed = 3.3
+                    vertical_lift = 1.60
+
+                # Directional horizontal control: Racket placement + stroke momentum
+                offset_x = ball.x - player_paddle.x
+                target_vx = float(np.clip(
+                    0.15 * ball.vx + offset_x * 1.5 + player_paddle.vx * 0.35,
+                    -0.85,
+                    0.85,
+                ))
+
+                ball.vx = target_vx
+                ball.vy = vertical_lift
+                ball.vz = forward_speed
+                # Nudge ball slightly in front of paddle to prevent multiple triggers in consecutive sub-steps
+                ball.z = max(ball.z, player_paddle.z + 0.06)
 
                 ball.last_hitter = "PLAYER"
                 ball.bounce_count_current_hit = 0
@@ -227,21 +242,21 @@ class PhysicsEngine:
                     details=shot_type,
                 ))
 
-        # AI Paddle: Clean arc return that reliably reaches player's table and racket
-        elif ball.vz > 0.0 and ball.z >= 1.20:
+        # Roberval Paddle: Calibrated return arc that reaches player table and racket
+        elif ball.vz > 0.0 and ball.z >= 0.75:
             dx = ball.x - ai_paddle.x
             dy = ball.y - ai_paddle.y
             radial_dist = math.sqrt(dx * dx + dy * dy)
             z_dist = abs(ball.z - ai_paddle.z)
 
-            if radial_dist <= 0.45 and z_dist <= 0.35:
-                # Guaranteed high-clearance return: Clears net by 35cm, lands on player side, reaches player
-                ball.vz = -3.4
-                ball.vy = 2.8
-                # Angle aimed towards player table area
-                ball.vx = np.clip(0.3 * ball.vx + (ball.x - ai_paddle.x) * 1.5, -0.6, 0.6)
+            if radial_dist <= 0.45 and z_dist <= 0.40:
+                # Calibrated return: clears net smoothly, lands comfortably on player table, reaches baseline
+                ball.vz = -3.5
+                ball.vy = 1.70
+                ball.vx = float(np.clip(0.20 * ball.vx + (ball.x - ai_paddle.x) * 1.3, -0.65, 0.65))
+                ball.z = min(ball.z, ai_paddle.z - 0.06)
 
-                ball.last_hitter = "AI"
+                ball.last_hitter = "ROBERVAL"
                 ball.bounce_count_current_hit = 0
                 ball.bounced_player_side = False
                 ball.bounced_ai_side = False
@@ -249,7 +264,7 @@ class PhysicsEngine:
 
                 events.append(PhysicsEvent(
                     event_type="HIT",
-                    hitter="AI",
+                    hitter="ROBERVAL",
                     position=(ball.x, ball.y, ball.z),
                     velocity=(ball.vx, ball.vy, ball.vz),
                     speed_kmh=ball.speed_kmh,
