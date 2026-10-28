@@ -50,13 +50,13 @@ class Table:
         ball_radius: float,
     ) -> bool:
         """Check if the ball trajectory crosses the net plane at Z=0 below net height."""
-        # Check if ball crossed Z=0 in this frame
-        if (z_prev < 0.0 <= z_curr) or (z_prev > 0.0 >= z_curr) or abs(z_curr) < 0.015:
+        # Check if ball crossed Z=0 in this frame (strictly crossing the net plane)
+        if (z_prev < 0.0 <= z_curr) or (z_prev > 0.0 >= z_curr):
             # Check within net width (including overhang)
             max_x = self.half_width + self.net_overhang
             if -max_x <= x <= max_x:
                 # Check height from surface (0) to net top
-                if y - ball_radius <= self.net_height:
+                if (y - ball_radius) <= self.net_height:
                     return True
         return False
 

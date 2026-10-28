@@ -70,8 +70,8 @@ class GameStateMachine:
         self.player_score: int = 0
         self.ai_score: int = 0
         self.current_rally_count: int = 0
-        self.announcement: str = "WELCOME TO AI PING PONG! PRESS SERVE TO START"
-        self.announcement_timer: float = 3.0
+        self.announcement: str = "FECHE A MAO OU ESPACO PARA SACAR!"
+        self.announcement_timer: float = 4.0
 
         self.match_id = str(uuid.uuid4())
         self.stats = MatchStats(
@@ -228,11 +228,17 @@ class GameStateMachine:
                     scoring_party = "PLAYER" if event.details == "AI" else "AI"
                     self._award_point(scoring_party, "DOUBLE BOUNCE!")
 
-        elif event.event_type == "NET":
-            if self.ball.is_serve:
-                # Net on serve: Let or fault
-                self.announcement = "NET ON SERVE!"
-                self.announcement_timer = 1.0
+        elif event.event_type == "NET_FAULT":
+            self.ball.in_play = False
+            hitter = event.hitter or self.server
+            if hitter == "PLAYER":
+                self._award_point("AI", "BOLA NA REDE! PONTO DA IA")
+            else:
+                self._award_point("PLAYER", "IA ACERTOU A REDE! PONTO SEU!")
+
+        elif event.event_type in ("NET", "NET_CLIP"):
+            self.announcement = "RASPOU NA REDE!"
+            self.announcement_timer = 1.0
 
     def _evaluate_point_outcome(self):
         """When ball goes out of play, award point according to ITTF rules."""

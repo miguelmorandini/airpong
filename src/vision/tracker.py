@@ -27,7 +27,7 @@ class HandTrackingResult:
     # 3D coordinates mapped to table tennis space (meters)
     world_x: float = 0.0
     world_y: float = 0.20
-    world_z: float = -1.65
+    world_z: float = -1.40
     # Velocity in 3D (m/s)
     vx: float = 0.0
     vy: float = 0.0
@@ -37,6 +37,7 @@ class HandTrackingResult:
     norm_x: float = 0.5
     norm_y: float = 0.5
     hand_scale: float = 0.15
+    is_fist: bool = False
     gesture: GestureResult = None
     annotated_frame: Optional[np.ndarray] = None
 
@@ -178,9 +179,20 @@ class HandTracker:
 
         gesture = self.gesture_classifier.classify(velocity_vec, accel_vec)
 
+        # Detect Fist (closed hand) by checking if 3+ finger tips are curled toward wrist
+        folded_fingers = 0
+        finger_pairs = [(8, 6), (12, 10), (16, 14), (20, 18)]
+        for tip_idx, pip_idx in finger_pairs:
+            d_tip = math.hypot(landmarks[tip_idx].x - wrist.x, landmarks[tip_idx].y - wrist.y)
+            d_pip = math.hypot(landmarks[pip_idx].x - wrist.x, landmarks[pip_idx].y - wrist.y)
+            if d_tip < d_pip * 1.05:
+                folded_fingers += 1
+
+        is_fist = (folded_fingers >= 3)
+
         # Draw hand landmarks & paddle overlay on annotated frame
         self._draw_landmarks(annotated, landmarks, w, h)
-        self._draw_paddle_hud(annotated, palm_nx, palm_ny, gesture, w, h)
+        self._draw_paddle_hud(annotated, palm_nx, palm_ny, gesture, is_fist, w, h)
 
         return HandTrackingResult(
             detected=True,
@@ -194,6 +206,7 @@ class HandTracker:
             norm_x=float(palm_nx),
             norm_y=float(palm_ny),
             hand_scale=float(hand_scale),
+            is_fist=is_fist,
             gesture=gesture,
             annotated_frame=annotated,
         )
@@ -255,7 +268,7 @@ class HandTracker:
         for pt in coords:
             cv2.circle(frame, pt, 4, (255, 100, 0), -1)
 
-    def _draw_paddle_hud(self, frame: np.ndarray, nx: float, ny: float, gesture: GestureResult, w: int, h: int):
+    def _draw_paddle_hud(self, frame: np.ndarray, nx: float, ny: float, gesture: GestureResult, is_fist: bool, w: int, h: int):
         """Draw virtual paddle blade, table calibration box, and speed indicator."""
         # 1. Calibration Box (Camera Hand Space -> Table Tennis Space)
         bx1, by1 = int(0.15 * w), int(0.20 * h)
@@ -268,13 +281,26 @@ class HandTracker:
         cv2.putText(frame, "CENTRO", (int(w / 2) - 25, by2 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 180), 1)
         cv2.putText(frame, "DIR", (bx2 - 35, by2 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 180), 1)
 
-        # 2. Virtual Paddle attached to hand
+        # 2. Virtual Paddle or Fist indicator
         px, py = int(nx * w), int(ny * h)
-        cv2.circle(frame, (px, py), 28, (30, 30, 220), -1)      # Red rubber
-        cv2.circle(frame, (px, py), 28, (255, 255, 255), 2)     # White rim
-        cv2.line(frame, (px, py + 22), (px, py + 48), (100, 70, 50), 6)  # Wood handle
+        if is_fist:
+            cv2.circle(frame, (px, py), 26, (0, 230, 255), -1)
+            cv2.circle(frame, (px, py), 30, (255, 255, 255), 2)
+            cv2.putText(frame, "FIST", (px - 16, py + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (20, 20, 20), 2)
+        else:
+            cv2.circle(frame, (px, py), 28, (30, 30, 220), -1)      # Red rubber
+            cv2.circle(frame, (px, py), 28, (255, 255, 255), 2)     # White rim
+            cv2.line(frame, (px, py + 22), (px, py + 48), (100, 70, 50), 6)  # Wood handle
 
         # 3. Status indicator
-        status_text = "BLOQUEIO ATIVO: ESPERE A BOLA BATER" if not gesture.is_active_swing else f"{gesture.stroke_type}: {gesture.swing_speed_kmh:.1f} km/h"
-        color = (0, 255, 200) if not gesture.is_active_swing else (0, 255, 100)
+        if is_fist:
+            status_text = "MAO FECHADA: SACAR / RESET!"
+            color = (0, 230, 255)
+        elif not gesture.is_active_swing:
+            status_text = "BLOQUEIO ATIVO: ESPERE A BOLA"
+            color = (0, 255, 200)
+        else:
+            status_text = f"{gesture.stroke_type}: {gesture.swing_speed_kmh:.1f} km/h"
+            color = (0, 255, 100)
+
         cv2.putText(frame, status_text, (15, h - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)

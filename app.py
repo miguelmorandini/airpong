@@ -460,6 +460,17 @@ function update(dt) {{
             }}
         }}
 
+        // Net Collision Resolution (Never gets stuck)
+        if (Math.abs(ball.z) < 0.04 && Math.abs(ball.x) <= 0.88) {{
+            if (ball.y < 0.13) {{
+                awardPoint(ball.lastHitter === "PLAYER" ? "AI" : "PLAYER", "BOLA NA REDE!");
+                ball.inPlay = false;
+            }} else if (ball.y <= 0.17) {{
+                ball.vz = (ball.vz > 0 ? 2.4 : -2.4);
+                ball.z += (ball.vz > 0 ? 0.06 : -0.06);
+            }}
+        }}
+
         // Table Bounce
         if (ball.y <= 0.02) {{
             const onTable = (Math.abs(ball.x) <= 0.7625 && Math.abs(ball.z) <= 1.37);

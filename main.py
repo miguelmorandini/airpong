@@ -64,6 +64,7 @@ def run_desktop_app():
     cv2.setMouseCallback(window_name, on_mouse_event)
 
     prev_time = time.time()
+    prev_fist = False
 
     try:
         while True:
@@ -79,16 +80,27 @@ def run_desktop_app():
             # 2. Track hand via MediaPipe
             track_res = tracker.process_frame(frame)
 
+            # 2.1. Hand Fist Gesture (Fechar a Mão) to Serve / Restart
+            current_fist = track_res.detected and track_res.is_fist
+            if current_fist and not prev_fist:
+                if game.status in (MatchStatus.READY, MatchStatus.SERVING):
+                    game.trigger_serve()
+                    sounds.play_hit(is_smash=True)
+                    print("[GESTO] Mão fechada: Saque disparado!")
+                elif game.status == MatchStatus.GAME_OVER:
+                    game.start_new_match()
+            prev_fist = current_fist
+
             # Determine paddle position: Mouse takes priority if actively moved recently, else hand
             use_mouse = (now - mouse_last_moved[0]) < 1.2
             if use_mouse or not track_res.detected:
                 target_x = mouse_pos[0]
                 target_y = mouse_pos[1]
-                target_z = -1.65
+                target_z = -1.40
             else:
                 target_x = track_res.world_x
                 target_y = track_res.world_y
-                target_z = track_res.world_z
+                target_z = -1.40
 
             game.player_paddle.update_position(target_x, target_y, target_z, dt)
 
@@ -132,13 +144,13 @@ def run_desktop_app():
             )
 
             # 7. Render Controls Legend on Bottom Left
-            control_hint = "CONTROLE: MOUSE / WEBCAM | CLIQUE/ESPACO: SACAR | R: RESET"
+            control_hint = "GESTO: FECHE A MAO OU [ESPACO] P/ SACAR | APENAS POSICIONE A MAO NA BOLA"
             cv2.putText(
                 scene_frame,
                 control_hint,
-                (25, sh - 20),
+                (20, sh - 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.55,
+                0.50,
                 (240, 240, 240),
                 2,
             )

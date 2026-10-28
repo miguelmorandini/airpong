@@ -228,20 +228,34 @@ class PhysicsEngine:
                     details="RETURN",
                 ))
 
-        # 3. Check Net Collision
+        # 3. Check Net Collision (Decisive ITTF Net Resolution: Never gets stuck)
         if self.table.check_net_collision(prev_z, ball.z, ball.x, ball.y, ball.radius):
-            # Ball hit net tape or net cord
-            # Dampen velocity and deflect
-            ball.vz = -0.35 * ball.vz
-            ball.vy = max(0.4, ball.vy * 0.5)
-            ball.vx *= 0.6
-            events.append(PhysicsEvent(
-                event_type="NET",
-                hitter=ball.last_hitter,
-                position=(ball.x, ball.y, ball.z),
-                speed_kmh=ball.speed_kmh,
-                details="Ball collided with net",
-            ))
+            # If ball clipped the very top tape (top 2cm of net), let it roll over
+            if ball.y >= (self.table.net_height - 0.025):
+                # Preserves forward direction, slight drag
+                forward_sign = 1.0 if prev_z < ball.z else -1.0
+                ball.vz = forward_sign * max(2.0, abs(ball.vz) * 0.75)
+                ball.vy = max(0.5, ball.vy * 0.7)
+                ball.z += 0.04 * forward_sign  # Nudge past net plane
+                events.append(PhysicsEvent(
+                    event_type="NET_CLIP",
+                    hitter=ball.last_hitter,
+                    position=(ball.x, ball.y, ball.z),
+                    speed_kmh=ball.speed_kmh,
+                    details="NET_CLIP",
+                ))
+            else:
+                # Ball hit mesh below tape: Definite Net Fault!
+                ball.in_play = False
+                ball.vz = 0.0
+                ball.vy = -0.5
+                events.append(PhysicsEvent(
+                    event_type="NET_FAULT",
+                    hitter=ball.last_hitter,
+                    position=(ball.x, ball.y, ball.z),
+                    speed_kmh=ball.speed_kmh,
+                    details="NET_FAULT",
+                ))
 
         # 4. Table Surface Bounce Collision
         if ball.y <= ball.radius:
