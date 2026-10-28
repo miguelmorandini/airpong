@@ -107,8 +107,11 @@ def run_desktop_app():
 
             # 2.2. SERVE BY PHYSICAL HAND/ARM SWING MOTION & FORCE
             if game.status == MatchStatus.SERVING and game.server == "PLAYER":
-                arm_speed = max(track_res.hook_power, game.player_paddle.speed) if track_res.detected else game.player_paddle.speed
-                is_swing = track_res.is_hook_swing or (arm_speed >= 0.85) or (game.player_paddle.vz > 0.8)
+                arm_speed = game.player_paddle.speed if not track_res.detected else max(
+                    getattr(track_res, "hook_power", game.player_paddle.speed),
+                    game.player_paddle.speed,
+                )
+                is_swing = getattr(track_res, "is_hook_swing", False) or (arm_speed >= 0.85) or (game.player_paddle.vz > 0.8)
 
                 dx = game.ball.x - game.player_paddle.x
                 dy = game.ball.y - game.player_paddle.y
@@ -158,29 +161,37 @@ def run_desktop_app():
             scene_frame = renderer.render_frame(game)
             sounds.update_and_render(scene_frame, dt)
 
-            # 6. Composite Camera HUD (Bottom Right Corner)
-            cam_view = cv2.resize(track_res.annotated_frame, (260, 195))
+            # 6. Composite Camera Picture-in-Picture (Top-Right: completely outside table area)
+            cw, ch = 190, 142
+            cam_view = cv2.resize(track_res.annotated_frame, (cw, ch))
             sh, sw = scene_frame.shape[:2]
-            ch, cw = cam_view.shape[:2]
-            scene_frame[sh - ch - 15 : sh - 15, sw - cw - 15 : sw - 15] = cam_view
+            cam_x1 = sw - cw - 15
+            cam_y1 = 82
+            cam_x2 = sw - 15
+            cam_y2 = cam_y1 + ch
+
+            scene_frame[cam_y1:cam_y2, cam_x1:cam_x2] = cam_view
             cv2.rectangle(
                 scene_frame,
-                (sw - cw - 15, sh - ch - 15),
-                (sw - 15, sh - 15),
+                (cam_x1, cam_y1),
+                (cam_x2, cam_y2),
                 (255, 255, 255),
                 2,
             )
+            # Small discrete badge for camera
+            cv2.rectangle(scene_frame, (cam_x1, cam_y1 - 16), (cam_x1 + 72, cam_y1), (25, 25, 30), -1)
+            cv2.putText(scene_frame, "WEBCAM", (cam_x1 + 6, cam_y1 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 230, 255), 1)
 
-            # 7. Render Controls Legend on Bottom Left
-            control_hint = "INICIAR: FECHE A MAO ✊ | SACAR: GOLPE COM FORCA DO BRACO 🏓 | ADVERSARIO: ROBERVAL"
+            # 7. Render Discrete Controls Legend on Bottom Left
+            control_hint = "INICIAR: FECHE A MAO ✊ | SACAR: GOLPE COM O BRACO 🏓 | ADVERSARIO: ROBERVAL"
             cv2.putText(
                 scene_frame,
                 control_hint,
-                (20, sh - 20),
+                (20, sh - 15),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.48,
-                (240, 240, 240),
-                2,
+                0.44,
+                (220, 220, 220),
+                1,
             )
 
             cv2.imshow(window_name, scene_frame)

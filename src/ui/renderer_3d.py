@@ -308,77 +308,73 @@ class PerspectiveRenderer3D:
         )
 
     def _render_strike_guide(self, frame: np.ndarray, game_state: GameStateMachine):
-        """Render intuitive aiming guide and 'REBATA AGORA!' prompt when ball is hittable."""
+        """Render discrete corner status pill and visual guideline without obscuring paddle."""
         ball = game_state.ball
         paddle = game_state.player_paddle
 
-        # Guide during serve preparation
+        # 1. Subtle 3D guideline between paddle and ball (NO text blocking paddle)
         if game_state.status == MatchStatus.SERVING and game_state.server == "PLAYER":
             p_proj = self.project_point(paddle.x, paddle.y, paddle.z)
             b_proj = self.project_point(ball.x, ball.y, ball.z)
             if p_proj and b_proj:
-                px, py, _ = p_proj
-                bx, by, _ = b_proj
-                cv2.line(frame, (px, py), (bx, by), (0, 255, 255), 2)
-                cv2.putText(
-                    frame,
-                    "SAQUE: GOLPEIE COM O BRACO! 🏓",
-                    (px - 110, py - 45),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    0.65,
-                    (0, 255, 255),
-                    2,
-                )
-            return
-
-        # Guide during ready state
-        if game_state.status == MatchStatus.READY:
-            p_proj = self.project_point(paddle.x, paddle.y, paddle.z)
-            if p_proj:
-                px, py, _ = p_proj
-                cv2.putText(
-                    frame,
-                    "FECHE A MAO ✊ PARA INICIAR",
-                    (px - 115, py - 45),
-                    cv2.FONT_HERSHEY_DUPLEX,
-                    0.65,
-                    (255, 220, 0),
-                    2,
-                )
-            return
-
-        # Ball is on player's side during active rally
-        if ball.in_play and ball.z < -0.6:
+                cv2.line(frame, (p_proj[0], p_proj[1]), (b_proj[0], b_proj[1]), (0, 255, 255), 2)
+        elif ball.in_play and ball.z < -0.6:
             p_proj = self.project_point(paddle.x, paddle.y, paddle.z)
             b_proj = self.project_point(ball.x, ball.y, ball.z)
-
             if p_proj and b_proj:
-                px, py, _ = p_proj
-                bx, by, _ = b_proj
-
-                # Calculate 3D distance between paddle and ball
                 dx = ball.x - paddle.x
                 dy = ball.y - paddle.y
                 dist_xy = math.sqrt(dx * dx + dy * dy)
                 is_in_reach = dist_xy <= paddle.config.ASSISTED_RADIUS
+                line_color = (0, 255, 120) if is_in_reach else (60, 60, 255)
+                cv2.line(frame, (p_proj[0], p_proj[1]), (b_proj[0], b_proj[1]), line_color, 2)
 
-                # Draw guideline between paddle and ball
-                line_color = (0, 255, 120) if is_in_reach else (60, 60, 255)  # Green if ready, red if far
-                cv2.line(frame, (px, py), (bx, by), line_color, 2)
+        # 2. Discrete Status & Instruction Pill in Top-Left Corner (completely away from paddle and table)
+        pill_x, pill_y = 25, 88
+        pill_w, pill_h = 320, 32
 
-                # Prompt text
-                if -1.80 <= ball.z <= -1.10:
-                    status_msg = "REBATA AGORA!" if is_in_reach else "MOVA A RAQUETE!"
-                    msg_color = (0, 255, 255) if is_in_reach else (100, 100, 255)
-                    cv2.putText(
-                        frame,
-                        status_msg,
-                        (px - 60, py - 45),
-                        cv2.FONT_HERSHEY_DUPLEX,
-                        0.7,
-                        msg_color,
-                        2,
-                    )
+        if game_state.status == MatchStatus.READY:
+            msg = "FECHE A MAO PARA INICIAR O JOGO"
+            color = (0, 230, 255)
+        elif game_state.status == MatchStatus.SERVING and game_state.server == "PLAYER":
+            msg = "SAQUE: GOLPEIE COM FORCA DO BRACO!"
+            color = (0, 255, 120)
+        elif game_state.status == MatchStatus.SERVING and game_state.server in ("AI", "ROBERVAL"):
+            msg = "SAQUE DO ROBERVAL..."
+            color = (180, 180, 255)
+        elif game_state.status == MatchStatus.RALLY:
+            if ball.in_play and ball.z < -0.8:
+                dx = ball.x - paddle.x
+                dy = ball.y - paddle.y
+                dist_xy = math.sqrt(dx * dx + dy * dy)
+                is_in_reach = dist_xy <= paddle.config.ASSISTED_RADIUS
+                msg = "REBATA AGORA!" if is_in_reach else "ALINHE A RAQUETE COM A BOLA"
+                color = (0, 255, 255) if is_in_reach else (100, 200, 255)
+            else:
+                msg = "BOLA EM JOGO"
+                color = (200, 240, 200)
+        elif game_state.status == MatchStatus.GAME_OVER:
+            msg = "FIM DE JOGO! FECHE A MAO P/ REINICIAR"
+            color = (0, 230, 255)
+        else:
+            msg = ""
+            color = (200, 200, 200)
+
+        if msg:
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h), (20, 25, 35), -1)
+            cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
+            cv2.rectangle(frame, (pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h), (255, 255, 255), 1)
+            cv2.circle(frame, (pill_x + 14, pill_y + int(pill_h / 2)), 4, color, -1)
+            cv2.putText(
+                frame,
+                msg,
+                (pill_x + 26, pill_y + 21),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.42,
+                color,
+                1,
+            )
 
     def _render_hud(self, frame: np.ndarray, game_state: GameStateMachine):
         """Wii Sports style scoreboard, announcement banner, and rally counter."""

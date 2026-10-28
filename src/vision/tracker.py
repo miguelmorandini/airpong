@@ -38,8 +38,21 @@ class HandTrackingResult:
     norm_y: float = 0.5
     hand_scale: float = 0.15
     is_fist: bool = False
-    gesture: GestureResult = None
+    gesture: Optional[GestureResult] = None
     annotated_frame: Optional[np.ndarray] = None
+
+    @property
+    def is_hook_swing(self) -> bool:
+        if self.gesture:
+            return getattr(self.gesture, "is_hook_swing", False)
+        return False
+
+    @property
+    def hook_power(self) -> float:
+        if self.gesture and hasattr(self.gesture, "swing_speed"):
+            if self.gesture.swing_speed > 0:
+                return float(self.gesture.swing_speed)
+        return float(math.sqrt(self.vx * self.vx + self.vy * self.vy + self.vz * self.vz))
 
 
 class HandTracker:

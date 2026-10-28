@@ -66,4 +66,8 @@ def test_hand_tracker_with_frame():
     assert -0.2 <= result.world_y <= 1.0
     assert -2.5 <= result.world_z <= 0.0
     assert result.annotated_frame is not None
+    assert hasattr(result, "hook_power")
+    assert hasattr(result, "is_hook_swing")
+    assert isinstance(result.hook_power, (int, float))
+    assert isinstance(result.is_hook_swing, bool)
     cam.release()
