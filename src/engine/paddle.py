@@ -15,13 +15,13 @@ class Paddle:
     config: PaddleConfig = field(default_factory=PaddleConfig)
     x: float = 0.0
     y: float = 0.20
-    z: float = -1.65
+    z: float = -1.40
     vx: float = 0.0
     vy: float = 0.0
     vz: float = 0.0
     tilt_x: float = 0.0  # radians
     tilt_y: float = 0.0  # radians
-    radius: float = 0.25
+    radius: float = 0.28
     depth_tolerance: float = 0.35  # Generous depth tolerance
     assisted_mode: bool = True     # Wii Sports style magnetic assist
 

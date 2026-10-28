@@ -255,7 +255,7 @@ let ball = {{
 }};
 
 // Paddles
-let playerPaddle = {{ x: 0, y: 0.20, z: -1.65, vx: 0, vy: 0, radius: 0.28 }};
+let playerPaddle = {{ x: 0, y: 0.20, z: -1.40, vx: 0, vy: 0, radius: 0.28 }};
 let aiPaddle = {{ x: 0, y: 0.20, z: 1.65, vx: 0, vy: 0, radius: 0.25 }};
 
 // Mouse tracking
@@ -451,11 +451,11 @@ function update(dt) {{
             }}
         }}
 
-        // Player Assisted Hit Zone (Wii Sports Style)
-        if (ball.vz < 0 && ball.z <= -1.25 && ball.z >= -1.75) {{
+        // Player Solid Racket Interception (Just wait for the ball to hit!)
+        if (ball.vz < 0 && ball.z <= -1.18 && ball.z >= -1.65) {{
             const distP = Math.hypot(ball.x - playerPaddle.x, ball.y - playerPaddle.y);
-            // Generous 0.50m reach: if you move toward the ball, you hit it!
-            if (distP <= 0.50) {{
+            // Solid surface interception: if ball hits paddle disc, auto-rebounds!
+            if (distP <= 0.42) {{
                 hitPlayerBall(false);
             }}
         }}

@@ -167,23 +167,31 @@ class PhysicsEngine:
         ball.y += ball.vy * dt
         ball.z += ball.vz * dt
 
-        # 2. Check Paddle Collisions
-        # Player Paddle collision check (only if ball is heading towards player side or in zone)
-        if ball.vz < 0.0 and ball.z < -1.1:
-            hit, dist, z_dist = player_paddle.check_ball_collision(ball.position, ball.radius)
-            if hit:
-                new_v, shot_type = player_paddle.compute_rebound_velocity(
-                    ball.velocity, ball.position, self.ball_config.RESTITUTION_PADDLE
-                )
-                ball.vx, ball.vy, ball.vz = new_v
+        # 2. Check Paddle Collisions (Solid Racket Interception & Block Mode)
+        # Player Paddle: Automatic bounce on racket interception
+        if ball.vz < 0.0 and ball.z <= -1.20:
+            dx = ball.x - player_paddle.x
+            dy = ball.y - player_paddle.y
+            radial_dist = math.sqrt(dx * dx + dy * dy)
+            z_dist = abs(ball.z - player_paddle.z)
+
+            # Hit connects if ball is within racket disc + generous margin
+            if radial_dist <= 0.40 and z_dist <= 0.35:
+                # Rebound ball forward with reliable net-clearing arc
+                forward_speed = max(3.2, min(5.5, abs(ball.vz) * 0.95 + abs(player_paddle.vz) * 0.6))
+                ball.vz = forward_speed
+                ball.vy = max(1.9, min(2.8, abs(ball.vy) * 0.6 + 1.4))
+                # Angle towards opponent table based on strike position on blade
+                ball.vx = np.clip(0.4 * ball.vx + (ball.x - player_paddle.x) * 2.5 + player_paddle.vx * 0.5, -1.8, 1.8)
+
                 ball.last_hitter = "PLAYER"
                 ball.bounce_count_current_hit = 0
                 ball.bounced_player_side = False
                 ball.bounced_ai_side = False
                 ball.is_serve = False
-                # Add topspin if swing had upward vy
-                ball.spin_x = player_paddle.vy * 3.5
+                ball.spin_x = player_paddle.vy * 2.0
 
+                shot_type = "SMASH" if player_paddle.speed > 5.0 else "BLOCK/RETURN"
                 events.append(PhysicsEvent(
                     event_type="HIT",
                     hitter="PLAYER",
@@ -193,20 +201,23 @@ class PhysicsEngine:
                     details=shot_type,
                 ))
 
-        # AI Paddle collision check (only if ball is heading towards AI side or in zone)
-        elif ball.vz > 0.0 and ball.z > 1.1:
-            hit, dist, z_dist = ai_paddle.check_ball_collision(ball.position, ball.radius)
-            if hit:
-                new_v, shot_type = ai_paddle.compute_rebound_velocity(
-                    ball.velocity, ball.position, self.ball_config.RESTITUTION_PADDLE
-                )
-                ball.vx, ball.vy, ball.vz = new_v
+        # AI Paddle: Interception and return
+        elif ball.vz > 0.0 and ball.z >= 1.20:
+            dx = ball.x - ai_paddle.x
+            dy = ball.y - ai_paddle.y
+            radial_dist = math.sqrt(dx * dx + dy * dy)
+            z_dist = abs(ball.z - ai_paddle.z)
+
+            if radial_dist <= 0.40 and z_dist <= 0.35:
+                ball.vz = -max(3.0, min(5.0, abs(ball.vz) * 0.95))
+                ball.vy = max(1.9, min(2.8, abs(ball.vy) * 0.6 + 1.4))
+                ball.vx = np.clip(0.4 * ball.vx + (ball.x - ai_paddle.x) * 2.0, -1.8, 1.8)
+
                 ball.last_hitter = "AI"
                 ball.bounce_count_current_hit = 0
                 ball.bounced_player_side = False
                 ball.bounced_ai_side = False
                 ball.is_serve = False
-                ball.spin_x = ai_paddle.vy * 3.5
 
                 events.append(PhysicsEvent(
                     event_type="HIT",
@@ -214,7 +225,7 @@ class PhysicsEngine:
                     position=(ball.x, ball.y, ball.z),
                     velocity=(ball.vx, ball.vy, ball.vz),
                     speed_kmh=ball.speed_kmh,
-                    details=shot_type,
+                    details="RETURN",
                 ))
 
         # 3. Check Net Collision

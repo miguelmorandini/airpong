@@ -39,13 +39,13 @@ class BallConfig:
 
 @dataclass(frozen=True)
 class PaddleConfig:
-    """Paddle geometry and collision bounds."""
-    RADIUS: float = 0.25          # Generous 25 cm radius blade for intuitive arcade play
-    ASSISTED_RADIUS: float = 0.50 # Forgiving strike zone for Wii Sports casual feel
+    """Paddle geometry and collision bounds calibrated for hand-to-table interception."""
+    RADIUS: float = 0.28          # 28 cm blade radius for reliable block interception
+    ASSISTED_RADIUS: float = 0.42 # Forgiving strike reach
     HANDLE_LENGTH: float = 0.10   # Handle length
-    MAX_SWING_SPEED: float = 18.0 # Max registered swing speed in m/s (~65 km/h)
-    PLAYER_Z_REST: float = -1.65  # Player resting Z plane
-    AI_Z_REST: float = 1.65       # AI opponent resting Z plane
+    MAX_SWING_SPEED: float = 18.0 # Max registered swing speed in m/s
+    PLAYER_Z_REST: float = -1.40  # Player baseline strike plane (exact table end)
+    AI_Z_REST: float = 1.40       # AI opponent baseline plane
 
 
 @dataclass(frozen=True)

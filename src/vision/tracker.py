@@ -140,19 +140,25 @@ class HandTracker:
         hand_scale = math.sqrt((wrist.x - middle_mcp.x)**2 + (wrist.y - middle_mcp.y)**2)
         hand_scale = max(0.06, min(0.35, hand_scale))
 
-        # Map normalized coordinates to 3D Ping Pong Table coordinates:
-        # X: 0 (left) to 1 (right) -> -0.95m to +0.95m
-        target_x = (palm_nx - 0.5) * 1.90
-        # Y: 0 (top) to 1 (bottom) -> inverted: higher hand in frame = higher paddle (0.05m to 0.70m)
-        target_y = (1.0 - palm_ny) * 0.75 - 0.05
-        # Z: larger scale (closer to camera) = closer to player table side (-1.45m to -1.80m)
-        target_z = -1.80 + (hand_scale - 0.08) * 1.2
-        target_z = max(-1.85, min(-1.38, target_z))
+        # Calibrated 1:1 Mapping between Camera Hand Space and Table Tennis 3D Space:
+        # Camera active box: X in [0.15, 0.85], Y in [0.20, 0.80]
+        calib_x = np.clip((palm_nx - 0.15) / 0.70, 0.0, 1.0)
+        calib_y = np.clip((palm_ny - 0.20) / 0.60, 0.0, 1.0)
 
-        # EMA Smoothing
-        smoothed_x = self.alpha * target_x + (1.0 - self.alpha) * self.prev_x
-        smoothed_y = self.alpha * target_y + (1.0 - self.alpha) * self.prev_y
-        smoothed_z = self.alpha * target_z + (1.0 - self.alpha) * self.prev_z
+        # X: Left edge of table (-0.80m) to Right edge (+0.80m)
+        target_x = (calib_x - 0.5) * 1.65
+
+        # Y: Table surface (0.05m) up to upper strike limit (0.50m)
+        target_y = 0.05 + (1.0 - calib_y) * 0.45
+
+        # Z: Anchored right at the table baseline strike plane (-1.40m)
+        target_z = -1.40
+
+        # EMA Smoothing (responsive alpha = 0.55 for instant feel)
+        alpha = 0.55
+        smoothed_x = alpha * target_x + (1.0 - alpha) * self.prev_x
+        smoothed_y = alpha * target_y + (1.0 - alpha) * self.prev_y
+        smoothed_z = -1.40
 
         # Velocity
         vx = (smoothed_x - self.prev_x) / dt
@@ -250,14 +256,25 @@ class HandTracker:
             cv2.circle(frame, pt, 4, (255, 100, 0), -1)
 
     def _draw_paddle_hud(self, frame: np.ndarray, nx: float, ny: float, gesture: GestureResult, w: int, h: int):
-        """Draw virtual paddle blade and speed indicator."""
-        px, py = int(nx * w), int(ny * h)
-        # Paddle blade circle
-        cv2.circle(frame, (px, py), 30, (30, 30, 220), -1)      # Red rubber
-        cv2.circle(frame, (px, py), 30, (255, 255, 255), 2)     # White rim
-        cv2.line(frame, (px, py + 25), (px, py + 55), (100, 70, 50), 7)  # Wood handle
+        """Draw virtual paddle blade, table calibration box, and speed indicator."""
+        # 1. Calibration Box (Camera Hand Space -> Table Tennis Space)
+        bx1, by1 = int(0.15 * w), int(0.20 * h)
+        bx2, by2 = int(0.85 * w), int(0.80 * h)
+        cv2.rectangle(frame, (bx1, by1), (bx2, by2), (0, 240, 120), 1)
 
-        # Display stroke & speed
-        hud_text = f"{gesture.stroke_type}: {gesture.swing_speed_kmh:.1f} km/h"
-        color = (0, 255, 100) if gesture.is_active_swing else (200, 200, 200)
-        cv2.putText(frame, hud_text, (20, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+        # Labels
+        cv2.putText(frame, "AREA DE CONTROLE DA MESA", (bx1 + 10, by1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 240, 120), 1)
+        cv2.putText(frame, "ESQ", (bx1 + 5, by2 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 180), 1)
+        cv2.putText(frame, "CENTRO", (int(w / 2) - 25, by2 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 180), 1)
+        cv2.putText(frame, "DIR", (bx2 - 35, by2 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 180, 180), 1)
+
+        # 2. Virtual Paddle attached to hand
+        px, py = int(nx * w), int(ny * h)
+        cv2.circle(frame, (px, py), 28, (30, 30, 220), -1)      # Red rubber
+        cv2.circle(frame, (px, py), 28, (255, 255, 255), 2)     # White rim
+        cv2.line(frame, (px, py + 22), (px, py + 48), (100, 70, 50), 6)  # Wood handle
+
+        # 3. Status indicator
+        status_text = "BLOQUEIO ATIVO: ESPERE A BOLA BATER" if not gesture.is_active_swing else f"{gesture.stroke_type}: {gesture.swing_speed_kmh:.1f} km/h"
+        color = (0, 255, 200) if not gesture.is_active_swing else (0, 255, 100)
+        cv2.putText(frame, status_text, (15, h - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
