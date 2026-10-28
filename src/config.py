@@ -71,8 +71,8 @@ class CameraConfig:
 @dataclass(frozen=True)
 class DisplayConfig:
     """Rendering dimensions and Wii Sports palette."""
-    CANVAS_WIDTH: int = 800
-    CANVAS_HEIGHT: int = 560
+    CANVAS_WIDTH: int = 860
+    CANVAS_HEIGHT: int = 580
     TABLE_COLOR_RGB: Tuple[int, int, int] = (16, 92, 168)      # Classic ITTF Blue
     TABLE_BORDER_RGB: Tuple[int, int, int] = (245, 245, 245)   # Crisp White
     NET_COLOR_RGB: Tuple[int, int, int] = (220, 220, 225)      # Semi-transparent mesh

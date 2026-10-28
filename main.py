@@ -61,22 +61,24 @@ def run_desktop_app():
         cam = SyntheticCameraSource(width=640, height=480)
 
     window_name = "AI Ping Pong - Wii Sports Mode"
-    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
     cv2.setMouseCallback(window_name, on_mouse_event)
 
-    # Maximize window on startup
+    # Center window cleanly on desktop (Modo Janela Nativo sem esticar resolução)
     if sys.platform == "win32":
         try:
             import ctypes
-            hwnd = ctypes.windll.user32.FindWindowW(None, window_name)
-            if hwnd:
-                ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
+            user32 = ctypes.windll.user32
+            screen_w = user32.GetSystemMetrics(0)
+            screen_h = user32.GetSystemMetrics(1)
+            win_x = max(10, (screen_w - renderer.width) // 2)
+            win_y = max(20, (screen_h - renderer.height) // 2 - 25)
+            cv2.moveWindow(window_name, win_x, win_y)
         except Exception:
             pass
 
     prev_time = time.time()
     prev_fist = False
-    first_frame = True
 
     try:
         while True:
@@ -207,18 +209,6 @@ def run_desktop_app():
             )
 
             cv2.imshow(window_name, scene_frame)
-
-            # Ensure maximized window on first frame presentation
-            if first_frame:
-                first_frame = False
-                if sys.platform == "win32":
-                    try:
-                        import ctypes
-                        hwnd = ctypes.windll.user32.FindWindowW(None, window_name)
-                        if hwnd:
-                            ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
-                    except Exception:
-                        pass
 
             # 8. Keyboard handling
             key = cv2.waitKey(1) & 0xFF
