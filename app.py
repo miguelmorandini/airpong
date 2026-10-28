@@ -51,7 +51,7 @@ with st.sidebar:
     st.divider()
     st.subheader("Configurações da Partida")
     difficulty = st.selectbox(
-        "Dificuldade da IA",
+        "Dificuldade do Roberval",
         ["EASY (Fácil / Treino)", "MEDIUM (Equilibrado)", "HARD (Desafiador)", "CHAMPION (Campeão)"],
         index=1,
     )
@@ -174,7 +174,7 @@ HTML5_GAME_COMPONENT = f"""
     <div id="ui-overlay">
         <div class="score-badge score-player">VOCÊ: <span id="p-score">0</span></div>
         <div class="rally-box">RALLY: <span id="rally-count">0</span></div>
-        <div class="score-badge score-ai">IA ({diff_code}): <span id="ai-score">0</span></div>
+        <div class="score-badge score-ai">ROBERVAL ({diff_code}): <span id="ai-score">0</span></div>
     </div>
 
     <div id="banner">CLIQUE OU PRESSIONE ESPAÇO PARA SACAR!</div>
@@ -302,7 +302,7 @@ function serve() {{
         ball.vx = (Math.random() - 0.5) * 0.4;
         ball.vy = 1.6;
         ball.vz = -2.8;
-        ball.lastHitter = "AI";
+        ball.lastHitter = "ROBERVAL";
     }}
     showBanner("PLAY!", 1.0);
     playPaddleSound(false);
@@ -372,12 +372,12 @@ function awardPoint(winner, reason) {{
     }} else {{
         aiScore++;
         aiScoreEl.innerText = aiScore;
-        showBanner("PONTO DA IA! " + reason, 2.0);
+        showBanner("PONTO DO ROBERVAL! " + reason, 2.0);
     }}
 
     // Check game over (11 points, lead by 2)
     if ((playerScore >= 11 || aiScore >= 11) && Math.abs(playerScore - aiScore) >= 2) {{
-        const champ = playerScore > aiScore ? "VOCÊ VENCEU A PARTIDA! 🏆" : "A IA VENCEU A PARTIDA!";
+        const champ = playerScore > aiScore ? "VOCÊ VENCEU A PARTIDA! 🏆" : "ROBERVAL VENCEU A PARTIDA!";
         showBanner(champ, 4.0);
         status = "GAME_OVER";
         return;
@@ -385,14 +385,15 @@ function awardPoint(winner, reason) {{
 
     // Next server
     const totalPts = playerScore + aiScore;
-    server = (Math.floor(totalPts / 2) % 2 === 0) ? "PLAYER" : "AI";
+    server = (Math.floor(totalPts / 2) % 2 === 0) ? "PLAYER" : "ROBERVAL";
 
     setTimeout(() => {{
         status = "SERVING";
-        if (server === "AI") {{
+        if (server === "ROBERVAL" || server === "AI") {{
+            showBanner("SAQUE DO ROBERVAL...", 1.2);
             setTimeout(serve, 1000);
         }} else {{
-            showBanner("SEU SAQUE! CLIQUE PARA SACAR", 3.0);
+            showBanner("SEU SAQUE! CLIQUE OU MOVIMENTE O BRAÇO", 3.0);
         }}
     }}, 1800);
 }}

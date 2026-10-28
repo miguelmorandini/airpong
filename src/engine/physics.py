@@ -87,17 +87,17 @@ class PhysicsEngine:
         if server == "PLAYER":
             ball.x = 0.15
             ball.y = 0.28
-            ball.z = -1.50
-            ball.vx = -0.15
-            ball.vy = 1.7
-            ball.vz = 2.8
+            ball.z = -1.35
+            ball.vx = 0.0
+            ball.vy = 0.0
+            ball.vz = 0.0
         else:
             ball.x = -0.15
             ball.y = 0.28
-            ball.z = 1.50
-            ball.vx = 0.15
-            ball.vy = 1.7
-            ball.vz = -2.8
+            ball.z = 1.35
+            ball.vx = 0.0
+            ball.vy = 0.0
+            ball.vz = 0.0
 
     def step(
         self,

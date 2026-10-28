@@ -24,7 +24,7 @@ class PingPongAnalytics:
         df = pd.DataFrame(shots)
 
         p_shots = df[df["hitter"] == "PLAYER"]
-        ai_shots = df[df["hitter"] == "AI"]
+        ai_shots = df[df["hitter"].isin(["AI", "ROBERVAL"])]
 
         # Errors: balls hit out or into net
         p_errors = len(p_shots[p_shots["result"].isin(["OUT", "NET_FAULT"])])

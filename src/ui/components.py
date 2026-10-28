@@ -49,13 +49,13 @@ def render_kpi_cards(stats: MatchStats, player_score: int, ai_score: int, server
         st.metric(
             label="Placar da Partida",
             value=f"{player_score} - {ai_score}",
-            delta="Você vs IA",
+            delta="Você vs Roberval",
         )
 
     with c2:
         st.metric(
             label="Serviço Atual",
-            value="Jogador (Você)" if server == "PLAYER" else f"IA ({stats.difficulty})",
+            value="Jogador (Você)" if server == "PLAYER" else f"Roberval ({stats.difficulty})",
             delta="Alterna a cada 2 pontos",
         )
 

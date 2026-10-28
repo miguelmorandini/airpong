@@ -135,7 +135,7 @@ class LocalDeltaStorage:
                 SELECT
                     COUNT(*) as total_matches,
                     SUM(CASE WHEN winner = 'PLAYER' THEN 1 ELSE 0 END) as player_wins,
-                    SUM(CASE WHEN winner = 'AI' THEN 1 ELSE 0 END) as ai_wins,
+                    SUM(CASE WHEN winner IN ('AI', 'ROBERVAL') THEN 1 ELSE 0 END) as ai_wins,
                     AVG(avg_speed_kmh) as lifetime_avg_speed,
                     MAX(longest_rally) as record_rally,
                     SUM(player_smashes) as total_smashes

@@ -295,11 +295,12 @@ class PerspectiveRenderer3D:
         cv2.circle(frame, (px, py), blade_r, rim_color, max(1, int(blade_r * 0.08)))
 
         # Label tag above paddle
-        tag = "YOU" if is_player else "AI"
+        tag = "VOCE" if is_player else "ROBERVAL"
+        offset_x = 20 if is_player else 38
         cv2.putText(
             frame,
             tag,
-            (px - 14, py - blade_r - 8),
+            (px - offset_x, py - blade_r - 8),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (255, 255, 255),
@@ -311,7 +312,42 @@ class PerspectiveRenderer3D:
         ball = game_state.ball
         paddle = game_state.player_paddle
 
-        # Ball is on player's side
+        # Guide during serve preparation
+        if game_state.status == MatchStatus.SERVING and game_state.server == "PLAYER":
+            p_proj = self.project_point(paddle.x, paddle.y, paddle.z)
+            b_proj = self.project_point(ball.x, ball.y, ball.z)
+            if p_proj and b_proj:
+                px, py, _ = p_proj
+                bx, by, _ = b_proj
+                cv2.line(frame, (px, py), (bx, by), (0, 255, 255), 2)
+                cv2.putText(
+                    frame,
+                    "SAQUE: GOLPEIE COM O BRACO! 🏓",
+                    (px - 110, py - 45),
+                    cv2.FONT_HERSHEY_DUPLEX,
+                    0.65,
+                    (0, 255, 255),
+                    2,
+                )
+            return
+
+        # Guide during ready state
+        if game_state.status == MatchStatus.READY:
+            p_proj = self.project_point(paddle.x, paddle.y, paddle.z)
+            if p_proj:
+                px, py, _ = p_proj
+                cv2.putText(
+                    frame,
+                    "FECHE A MAO ✊ PARA INICIAR",
+                    (px - 115, py - 45),
+                    cv2.FONT_HERSHEY_DUPLEX,
+                    0.65,
+                    (255, 220, 0),
+                    2,
+                )
+            return
+
+        # Ball is on player's side during active rally
         if ball.in_play and ball.z < -0.6:
             p_proj = self.project_point(paddle.x, paddle.y, paddle.z)
             b_proj = self.project_point(ball.x, ball.y, ball.z)
@@ -355,16 +391,16 @@ class PerspectiveRenderer3D:
         cv2.rectangle(frame, (20, 15), (w - 20, 75), (255, 255, 255), 2)
 
         # Player Score
-        p_score_text = f"PLAYER: {game_state.player_score}"
+        p_score_text = f"VOCE: {game_state.player_score}"
         cv2.putText(frame, p_score_text, (45, 52), cv2.FONT_HERSHEY_DUPLEX, 0.9, (0, 230, 255), 2)
         if game_state.server == "PLAYER":
             cv2.circle(frame, (32, 45), 7, (0, 165, 255), -1)  # Serve ball indicator
 
-        # AI Score
-        ai_score_text = f"AI ({game_state.difficulty}): {game_state.ai_score}"
-        cv2.putText(frame, ai_score_text, (w - 320, 52), cv2.FONT_HERSHEY_DUPLEX, 0.9, (255, 120, 120), 2)
-        if game_state.server == "AI":
-            cv2.circle(frame, (w - 333, 45), 7, (0, 165, 255), -1)
+        # Roberval Score
+        roberval_score_text = f"ROBERVAL ({game_state.difficulty}): {game_state.ai_score}"
+        cv2.putText(frame, roberval_score_text, (w - 380, 52), cv2.FONT_HERSHEY_DUPLEX, 0.85, (255, 120, 120), 2)
+        if game_state.server in ("AI", "ROBERVAL"):
+            cv2.circle(frame, (w - 395, 45), 7, (0, 165, 255), -1)
 
         # Rally Counter in Center of Scoreboard
         rally_text = f"RALLY: {game_state.current_rally_count}"

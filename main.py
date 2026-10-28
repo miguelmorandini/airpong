@@ -80,15 +80,16 @@ def run_desktop_app():
             # 2. Track hand via MediaPipe
             track_res = tracker.process_frame(frame)
 
-            # 2.1. Hand Fist Gesture (Fechar a Mão) to Serve / Restart
+            # 2.1. Hand Fist Gesture (Fechar a Mão) ONLY to Start Game / Prepare Serve
             current_fist = track_res.detected and track_res.is_fist
             if current_fist and not prev_fist:
-                if game.status in (MatchStatus.READY, MatchStatus.SERVING):
-                    game.trigger_serve()
-                    sounds.play_hit(is_smash=True)
-                    print("[GESTO] Mão fechada: Saque disparado!")
+                if game.status == MatchStatus.READY:
+                    game.prepare_serve()
+                    sounds.play_bounce()
+                    print("[GESTO] Mão fechada ✊: Jogo iniciado! Bola posicionada para o saque.")
                 elif game.status == MatchStatus.GAME_OVER:
                     game.start_new_match()
+                    print("[GESTO] Mão fechada ✊: Nova partida iniciada contra Roberval!")
             prev_fist = current_fist
 
             # Determine paddle position: Mouse takes priority if actively moved recently, else hand
@@ -104,11 +105,37 @@ def run_desktop_app():
 
             game.player_paddle.update_position(target_x, target_y, target_z, dt)
 
+            # 2.2. SERVE BY PHYSICAL HAND/ARM SWING MOTION & FORCE
+            if game.status == MatchStatus.SERVING and game.server == "PLAYER":
+                arm_speed = max(track_res.hook_power, game.player_paddle.speed) if track_res.detected else game.player_paddle.speed
+                is_swing = track_res.is_hook_swing or (arm_speed >= 0.85) or (game.player_paddle.vz > 0.8)
+
+                dx = game.ball.x - game.player_paddle.x
+                dy = game.ball.y - game.player_paddle.y
+                dist_xy = math.sqrt(dx * dx + dy * dy)
+
+                if (is_swing and dist_xy <= 0.65) or (dist_xy <= 0.35 and arm_speed >= 0.70):
+                    vy_lift = game.player_paddle.vy if game.player_paddle.vy > 0 else 0.5
+                    game.strike_serve(
+                        swing_speed=arm_speed,
+                        vx_offset=(game.ball.x - game.player_paddle.x),
+                        vy_lift=vy_lift,
+                    )
+                    sounds.play_hit(is_smash=(arm_speed >= 2.4))
+                    sounds.trigger_hit_spark(450, 480, "SERVE")
+                    print(f"[SAQUE] Golpe executado com forca do braco: {arm_speed:.2f} m/s ({game.ball.speed_kmh:.1f} km/h)")
+
             # 3. Handle Mouse Click / Swing
             if click_swing[0]:
                 click_swing[0] = False
-                if game.status in (MatchStatus.READY, MatchStatus.SERVING):
-                    game.trigger_serve()
+                if game.status == MatchStatus.READY:
+                    game.prepare_serve()
+                    sounds.play_bounce()
+                elif game.status == MatchStatus.SERVING and game.server == "PLAYER":
+                    arm_speed = max(2.4, game.player_paddle.speed)
+                    game.strike_serve(swing_speed=arm_speed, vx_offset=(game.ball.x - game.player_paddle.x), vy_lift=0.6)
+                    sounds.play_hit(is_smash=True)
+                    sounds.trigger_hit_spark(450, 480, "SERVE")
                 elif game.status == MatchStatus.RALLY:
                     # Apply power smash forward impulse
                     game.player_paddle.vx = (game.ball.x - game.player_paddle.x) * 4.0
@@ -145,13 +172,13 @@ def run_desktop_app():
             )
 
             # 7. Render Controls Legend on Bottom Left
-            control_hint = "SAQUE: FECHE A MAO ✊ | REBATER: MOVIMENTO DE GANCHO COM O BRACO 🏓"
+            control_hint = "INICIAR: FECHE A MAO ✊ | SACAR: GOLPE COM FORCA DO BRACO 🏓 | ADVERSARIO: ROBERVAL"
             cv2.putText(
                 scene_frame,
                 control_hint,
                 (20, sh - 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.50,
+                0.48,
                 (240, 240, 240),
                 2,
             )
@@ -163,7 +190,13 @@ def run_desktop_app():
             if key in (27, ord("q"), ord("Q")):
                 break
             elif key == 32:  # Space
-                game.trigger_serve()
+                if game.status == MatchStatus.READY:
+                    game.prepare_serve()
+                    sounds.play_bounce()
+                elif game.status == MatchStatus.SERVING and game.server == "PLAYER":
+                    game.strike_serve(swing_speed=2.5, vx_offset=0.0, vy_lift=0.6)
+                    sounds.play_hit(is_smash=True)
+                    sounds.trigger_hit_spark(450, 480, "SERVE")
             elif key in (ord("r"), ord("R")):
                 if game.stats.shots:
                     storage.save_match(game.stats)
