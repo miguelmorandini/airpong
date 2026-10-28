@@ -43,6 +43,12 @@ def test_serve_mechanics_fist_ready_and_arm_strike():
     assert sm.ball.in_play is True
     assert sm.ball.vz == 0.0  # Floating waiting for arm strike
 
+    # Ensure update frame while in SERVING runs without error (floating ball hover)
+    for _ in range(10):
+        sm.update(dt=0.016)
+    assert sm.status == MatchStatus.SERVING
+    assert sm.ball.in_play is True
+
     # 2. Strike serve with arm swing speed
     sm.strike_serve(swing_speed=3.0, vx_offset=0.2, vy_lift=0.4)
     assert sm.status == MatchStatus.RALLY

@@ -1,5 +1,6 @@
 """Match state machine, ITTF scoring rules, and telemetry collector."""
 
+import math
 import time
 import uuid
 from dataclasses import dataclass, field

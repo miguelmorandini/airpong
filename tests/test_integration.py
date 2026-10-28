@@ -78,6 +78,11 @@ def test_desktop_main_loop_simulation():
     game.prepare_serve()
     assert game.status == MatchStatus.SERVING
 
+    # Simulate game.update() while in SERVING state (ball floating waiting for arm stroke)
+    for _ in range(5):
+        game.update(dt=0.016)
+    assert game.status == MatchStatus.SERVING
+
     # Step 2: In SERVING state, simulate HandTrackingResult with arm swing
     gesture = GestureResult(
         stroke_type="GANCHO_FOREHAND",
