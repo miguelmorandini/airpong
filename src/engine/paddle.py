@@ -10,21 +10,23 @@ from src.config import PaddleConfig
 
 @dataclass
 class Paddle:
-    """3D Virtual Table Tennis Paddle."""
+    """3D Virtual Table Tennis Paddle with Wii Sports Arcade Assistance."""
     is_player: bool
     config: PaddleConfig = field(default_factory=PaddleConfig)
     x: float = 0.0
-    y: float = 0.15
+    y: float = 0.20
     z: float = -1.65
     vx: float = 0.0
     vy: float = 0.0
     vz: float = 0.0
-    tilt_x: float = 0.0  # radians (pitch - forward/backward tilt for topspin/slice)
-    tilt_y: float = 0.0  # radians (yaw - lateral angle)
-    radius: float = 0.11
-    depth_tolerance: float = 0.18  # Collision depth zone along Z
+    tilt_x: float = 0.0  # radians
+    tilt_y: float = 0.0  # radians
+    radius: float = 0.25
+    depth_tolerance: float = 0.35  # Generous depth tolerance
+    assisted_mode: bool = True     # Wii Sports style magnetic assist
 
     def __post_init__(self):
+        self.radius = self.config.RADIUS
         if not self.is_player:
             self.z = self.config.AI_Z_REST
         else:
@@ -93,24 +95,28 @@ class Paddle:
         ball_radius: float,
     ) -> Tuple[bool, float, float]:
         """
-        Check if ball is colliding with the paddle blade.
+        Check if ball is colliding with the paddle blade (with arcade assistance).
         Returns:
             (collided, dist_to_center, z_dist)
         """
         bx, by, bz = ball_pos
-        # Distance in paddle face plane (XY)
         dx = bx - self.x
         dy = by - self.y
         radial_dist = math.sqrt(dx * dx + dy * dy)
-
-        # Distance along Z axis
         z_dist = abs(bz - self.z)
 
-        # Collision occurs if ball center is within radial blade boundary
-        # and close enough along Z (within depth tolerance + radius)
-        if radial_dist <= (self.radius + ball_radius * 0.75):
+        # Base physical blade hit
+        if radial_dist <= (self.radius + ball_radius):
             if z_dist <= (self.depth_tolerance + ball_radius):
                 return True, radial_dist, z_dist
+
+        # Arcade Assisted Mode (Wii Sports style) for player
+        if self.assisted_mode and self.is_player:
+            # When ball is in player strike zone (Z between -1.85 and -1.15)
+            if -1.85 <= bz <= -1.15:
+                # If paddle is within assisted reach
+                if radial_dist <= self.config.ASSISTED_RADIUS and z_dist <= (self.depth_tolerance + 0.15):
+                    return True, radial_dist, z_dist
 
         return False, radial_dist, z_dist
 
@@ -121,45 +127,45 @@ class Paddle:
         restitution: float = 0.90,
     ) -> Tuple[np.ndarray, str]:
         """
-        Compute new ball velocity after striking the paddle.
-        Returns:
-            (new_velocity_vector, shot_type)
+        Compute new ball velocity after striking the paddle with consistent returns.
         """
-        # Relative velocity
+        # Direction to opponent side
+        forward_dir = 1.0 if self.is_player else -1.0
+
+        # Base rebound calculation
         v_rel = ball_velocity - self.velocity
-
-        # Normal vector
         n = self.normal
-
-        # Impulse calculation: reflect normal component and add paddle velocity
         v_rel_n = np.dot(v_rel, n)
-        # We only rebound if ball is moving towards the paddle face
+
         if (self.is_player and v_rel_n < 0) or (not self.is_player and v_rel_n > 0):
-            # Elastic reflection along normal
             v_rebound = ball_velocity - (1.0 + restitution) * v_rel_n * n
-            # Add paddle swing momentum transfer
-            v_rebound += 0.85 * self.velocity
+            v_rebound += 0.8 * self.velocity
         else:
-            # Ball was moving in same direction or glancing hit
             v_rebound = ball_velocity + 0.8 * self.velocity
 
-        # Ensure minimal forward velocity towards opponent side
-        forward_dir = 1.0 if self.is_player else -1.0
-        min_forward_vz = 3.5 * forward_dir
-        if (self.is_player and v_rebound[2] < min_forward_vz) or \
-           (not self.is_player and v_rebound[2] > min_forward_vz):
-            v_rebound[2] = min_forward_vz
+        # Arc stabilization: Ensure ball clears the net comfortably
+        forward_speed = max(3.0, min(6.5, abs(v_rebound[2]) + abs(self.vz) * 0.5))
+        v_rebound[2] = forward_speed * forward_dir
 
-        # Add upward arc if ball was low
-        if ball_pos[1] < 0.10 and v_rebound[1] < 1.5:
-            v_rebound[1] = 1.8
+        # High arc so user can follow ball easily
+        v_rebound[1] = max(1.6, min(3.0, abs(v_rebound[1]) * 0.7 + 1.2))
 
-        # Classify shot type
+        # Angle slightly toward table center or cross-court based on swing
+        if self.is_player:
+            # Paddle lateral offset influences return angle
+            offset_x = (ball_pos[0] - self.x)
+            v_rebound[0] = np.clip(self.vx * 0.6 + offset_x * 2.0, -1.8, 1.8)
+
+        # Shot classification
         swing_speed = self.speed
-        if swing_speed > 8.0:
+        if swing_speed > 7.0 or self.vz > 4.0:
             shot_type = "SMASH"
-        elif self.vx > 2.0 or self.vx < -2.0:
-            shot_type = "FOREHAND" if (self.is_player and self.vx > 0) else "BACKHAND"
+            v_rebound[2] = 5.8 * forward_dir
+            v_rebound[1] = 1.2
+        elif self.vx > 1.8:
+            shot_type = "FOREHAND"
+        elif self.vx < -1.8:
+            shot_type = "BACKHAND"
         else:
             shot_type = "DRIVE"
 

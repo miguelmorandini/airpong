@@ -40,7 +40,8 @@ class BallConfig:
 @dataclass(frozen=True)
 class PaddleConfig:
     """Paddle geometry and collision bounds."""
-    RADIUS: float = 0.10          # 10 cm radius circular blade
+    RADIUS: float = 0.25          # Generous 25 cm radius blade for intuitive arcade play
+    ASSISTED_RADIUS: float = 0.50 # Forgiving strike zone for Wii Sports casual feel
     HANDLE_LENGTH: float = 0.10   # Handle length
     MAX_SWING_SPEED: float = 18.0 # Max registered swing speed in m/s (~65 km/h)
     PLAYER_Z_REST: float = -1.65  # Player resting Z plane

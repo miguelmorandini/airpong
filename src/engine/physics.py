@@ -85,19 +85,19 @@ class PhysicsEngine:
         ball.trail.clear()
 
         if server == "PLAYER":
-            ball.x = 0.20
-            ball.y = 0.22
+            ball.x = 0.15
+            ball.y = 0.28
             ball.z = -1.50
-            ball.vx = -0.3
-            ball.vy = 1.4
-            ball.vz = 4.2
+            ball.vx = -0.15
+            ball.vy = 1.7
+            ball.vz = 2.8
         else:
-            ball.x = -0.20
-            ball.y = 0.22
+            ball.x = -0.15
+            ball.y = 0.28
             ball.z = 1.50
-            ball.vx = 0.3
-            ball.vy = 1.4
-            ball.vz = -4.2
+            ball.vx = 0.15
+            ball.vy = 1.7
+            ball.vz = -2.8
 
     def step(
         self,

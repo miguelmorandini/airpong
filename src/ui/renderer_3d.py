@@ -71,6 +71,9 @@ class PerspectiveRenderer3D:
         # 4. 3D Net
         self._render_net(frame)
 
+        # 4.1. Landing Target & Anticipation Reticle
+        self._render_landing_target(frame, game_state.ball)
+
         # 5. Shadows
         self._render_shadows(frame, game_state.ball)
 
@@ -85,6 +88,9 @@ class PerspectiveRenderer3D:
 
         # 9. Player Paddle (Rendered in front)
         self._render_paddle(frame, game_state.player_paddle, is_player=True)
+
+        # 9.1. Strike Guide & Hitting Assist Prompt
+        self._render_strike_guide(frame, game_state)
 
         # 10. Wii Sports HUD & Announcements
         self._render_hud(frame, game_state)
@@ -194,6 +200,31 @@ class PerspectiveRenderer3D:
             cv2.line(frame, (n_bl[0], n_bl[1]), (n_tl[0], n_tl[1]), (50, 50, 50), 4)
             cv2.line(frame, (n_br[0], n_br[1]), (n_tr[0], n_tr[1]), (50, 50, 50), 4)
 
+    def _render_landing_target(self, frame: np.ndarray, ball: Ball):
+        """Render glowing Wii Sports landing target on table showing where ball will bounce."""
+        if not ball.in_play or abs(ball.vz) < 0.2:
+            return
+
+        # Estimate where ball will cross Y=0
+        # Simple ballistic approximation for landing spot
+        if ball.y > 0.05 and ball.vy < 1.5:
+            t_impact = (ball.vy + math.sqrt(max(0.01, ball.vy**2 + 2 * 9.81 * ball.y))) / 9.81
+            land_x = ball.x + ball.vx * t_impact
+            land_z = ball.z + ball.vz * t_impact
+
+            # Check if landing is on table
+            if abs(land_x) <= self.table_config.half_width and abs(land_z) <= self.table_config.half_length:
+                proj = self.project_point(land_x, 0.0, land_z)
+                if proj:
+                    lx, ly, lz = proj
+                    r_outer = max(6, int(35.0 / lz))
+                    r_inner = max(2, int(10.0 / lz))
+
+                    # Pulsing target rings
+                    color = (0, 240, 255) if land_z < 0 else (255, 120, 0)
+                    cv2.circle(frame, (lx, ly), r_outer, color, 2)
+                    cv2.circle(frame, (lx, ly), r_inner, (255, 255, 255), -1)
+
     def _render_shadows(self, frame: np.ndarray, ball: Ball):
         """Render soft circular shadow under ball to enhance 3D perception."""
         # Shadow on table surface (Y = 0)
@@ -274,6 +305,44 @@ class PerspectiveRenderer3D:
             (255, 255, 255),
             2,
         )
+
+    def _render_strike_guide(self, frame: np.ndarray, game_state: GameStateMachine):
+        """Render intuitive aiming guide and 'REBATA AGORA!' prompt when ball is hittable."""
+        ball = game_state.ball
+        paddle = game_state.player_paddle
+
+        # Ball is on player's side
+        if ball.in_play and ball.z < -0.6:
+            p_proj = self.project_point(paddle.x, paddle.y, paddle.z)
+            b_proj = self.project_point(ball.x, ball.y, ball.z)
+
+            if p_proj and b_proj:
+                px, py, _ = p_proj
+                bx, by, _ = b_proj
+
+                # Calculate 3D distance between paddle and ball
+                dx = ball.x - paddle.x
+                dy = ball.y - paddle.y
+                dist_xy = math.sqrt(dx * dx + dy * dy)
+                is_in_reach = dist_xy <= paddle.config.ASSISTED_RADIUS
+
+                # Draw guideline between paddle and ball
+                line_color = (0, 255, 120) if is_in_reach else (60, 60, 255)  # Green if ready, red if far
+                cv2.line(frame, (px, py), (bx, by), line_color, 2)
+
+                # Prompt text
+                if -1.80 <= ball.z <= -1.10:
+                    status_msg = "REBATA AGORA!" if is_in_reach else "MOVA A RAQUETE!"
+                    msg_color = (0, 255, 255) if is_in_reach else (100, 100, 255)
+                    cv2.putText(
+                        frame,
+                        status_msg,
+                        (px - 60, py - 45),
+                        cv2.FONT_HERSHEY_DUPLEX,
+                        0.7,
+                        msg_color,
+                        2,
+                    )
 
     def _render_hud(self, frame: np.ndarray, game_state: GameStateMachine):
         """Wii Sports style scoreboard, announcement banner, and rally counter."""

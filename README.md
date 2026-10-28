@@ -154,24 +154,30 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Execução no Desktop (Modo Nativo 60 FPS)
-Para a experiência mais fluida com zero latência:
+### 3. Execução no Desktop (Modo Nativo 60 FPS com Mouse ou Webcam)
+Para a experiência arcade nativa com máxima fluidez:
 ```bash
 python main.py
 ```
-**Controles no Teclado:**
+**Controles Intuitivos:**
+- 🖱️ **Mouse / Cursor**: Mova o mouse sobre a janela para mover a raquete com resposta instantânea e precisa.
+- 🖱️ **Clique Esquerdo**: Sacar a bola ou disparar um *Power Smash* no momento do impacto.
+- ✋ **Webcam / Mão**: O sistema detecta os 21 pontos da sua mão automaticamente.
+- 🏓 **Assistência Wii Sports**: A raquete possui zona de atração de 0,50 m para garantir rebatidas fáceis e ralis longos e divertidos.
 - `[ESPAÇO]`: Sacar a bola
 - `[R]`: Reiniciar partida
 - `[1]`, `[2]`, `[3]`, `[4]`: Mudar dificuldade da IA (Easy, Medium, Hard, Champion)
 - `[S]`: Salvar estatísticas da partida
 - `[Q]` ou `[ESC]`: Sair
 
-### 4. Execução Web com Streamlit
-Para executar o painel web interativo e o hub analítico:
+### 4. Execução Web no Streamlit (Databricks Apps)
+Para executar a quadra 3D interativa de 60 FPS no navegador:
 ```bash
 streamlit run app.py
 ```
 Acesse no navegador: `http://localhost:8501`.
+- A mesa 3D roda a **60 FPS diretamente no browser via HTML5 Canvas**.
+- Basta mover o cursor do mouse sobre a quadra para rebater a bola com física em tempo real e efeitos sonoros!
 
 ---
 
