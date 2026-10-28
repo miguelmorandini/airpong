@@ -1,0 +1,334 @@
+"""3D Perspective Projection Renderer with Wii Sports table tennis aesthetics."""
+
+import math
+from typing import List, Optional, Tuple
+import cv2
+import numpy as np
+
+from src.config import DisplayConfig, TableConfig
+from src.engine.physics import Ball
+from src.engine.paddle import Paddle
+from src.engine.game_state import GameStateMachine, MatchStatus
+
+
+class PerspectiveRenderer3D:
+    """Renders 3D table tennis game world to 2D image buffer."""
+
+    def __init__(
+        self,
+        display_config: Optional[DisplayConfig] = None,
+        table_config: Optional[TableConfig] = None,
+    ):
+        self.config = display_config or DisplayConfig()
+        self.table_config = table_config or TableConfig()
+
+        self.width = self.config.CANVAS_WIDTH
+        self.height = self.config.CANVAS_HEIGHT
+
+        # Camera placement: Behind player, slightly above table looking forward
+        self.cam_x = 0.0
+        self.cam_y = 0.72
+        self.cam_z = -2.60
+        self.cam_pitch = math.radians(14.0)  # Looking down 14 degrees
+        self.fov = math.radians(58.0)
+        self.focal_length = (self.width / 2.0) / math.tan(self.fov / 2.0)
+
+    def project_point(self, x: float, y: float, z: float) -> Optional[Tuple[int, int, float]]:
+        """Project 3D world coordinate (meters) to 2D screen coordinate (pixels)."""
+        # Relative to camera
+        dx = x - self.cam_x
+        dy = y - self.cam_y
+        dz = z - self.cam_z
+
+        # Pitch rotation
+        cos_p = math.cos(self.cam_pitch)
+        sin_p = math.sin(self.cam_pitch)
+
+        cam_y = dy * cos_p - dz * sin_p
+        cam_z = dy * sin_p + dz * cos_p
+
+        # Behind camera clip
+        if cam_z <= 0.15:
+            return None
+
+        # Perspective projection
+        screen_x = int(self.width / 2.0 + (self.focal_length * dx) / cam_z)
+        screen_y = int(self.height / 2.0 - (self.focal_length * cam_y) / cam_z)
+
+        return screen_x, screen_y, cam_z
+
+    def render_frame(self, game_state: GameStateMachine) -> np.ndarray:
+        """Render complete game scene to BGR image buffer."""
+        # 1. Background (Gradient gymnasium/stadium sky)
+        frame = self._render_background()
+
+        # 2. Gymnasium Floor
+        self._render_floor(frame)
+
+        # 3. 3D Table Surface & Markings
+        self._render_table(frame)
+
+        # 4. 3D Net
+        self._render_net(frame)
+
+        # 5. Shadows
+        self._render_shadows(frame, game_state.ball)
+
+        # 6. Motion Trails
+        self._render_ball_trail(frame, game_state.ball)
+
+        # 7. AI Paddle
+        self._render_paddle(frame, game_state.ai_paddle, is_player=False)
+
+        # 8. 3D Ball
+        self._render_ball(frame, game_state.ball)
+
+        # 9. Player Paddle (Rendered in front)
+        self._render_paddle(frame, game_state.player_paddle, is_player=True)
+
+        # 10. Wii Sports HUD & Announcements
+        self._render_hud(frame, game_state)
+
+        return frame
+
+    def _render_background(self) -> np.ndarray:
+        """Generate smooth vertical gradient background."""
+        frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        # Wii Sports Cyan/Sky gradient
+        top_color = np.array([245, 215, 175], dtype=np.float32)     # BGR
+        bot_color = np.array([215, 175, 120], dtype=np.float32)
+
+        for y in range(self.height):
+            ratio = y / self.height
+            color = (1.0 - ratio) * top_color + ratio * bot_color
+            frame[y, :] = color.astype(np.uint8)
+        return frame
+
+    def _render_floor(self, frame: np.ndarray):
+        """Render wooden stadium floor with court lines."""
+        # Project floor quad
+        p1 = self.project_point(-3.5, -0.76, -1.8)
+        p2 = self.project_point(3.5, -0.76, -1.8)
+        p3 = self.project_point(3.5, -0.76, 3.5)
+        p4 = self.project_point(-3.5, -0.76, 3.5)
+
+        if p1 and p2 and p3 and p4:
+            pts = np.array([[p1[0], p1[1]], [p2[0], p2[1]], [p3[0], p3[1]], [p4[0], p4[1]]], np.int32)
+            cv2.fillPoly(frame, [pts], (140, 165, 195))  # Warm wooden tone in BGR
+            # Border court line
+            cv2.polylines(frame, [pts], True, (255, 255, 255), 2)
+
+    def _render_table(self, frame: np.ndarray):
+        """Render 3D ITTF table top, white edges, and center line."""
+        w2 = self.table_config.half_width
+        l2 = self.table_config.half_length
+        y = self.table_config.SURFACE_Y
+
+        # Table surface corners
+        c_nw = self.project_point(-w2, y, l2)   # AI left
+        c_ne = self.project_point(w2, y, l2)    # AI right
+        c_se = self.project_point(w2, y, -l2)   # Player right
+        c_sw = self.project_point(-w2, y, -l2)  # Player left
+
+        if c_nw and c_ne and c_se and c_sw:
+            # Table top quad
+            table_pts = np.array([
+                [c_sw[0], c_sw[1]],
+                [c_se[0], c_se[1]],
+                [c_ne[0], c_ne[1]],
+                [c_nw[0], c_nw[1]],
+            ], np.int32)
+
+            # Classic ITTF Deep Blue table surface
+            cv2.fillPoly(frame, [table_pts], (165, 90, 15))
+
+            # Table side apron thickness
+            apron_y = y - 0.04
+            c_se_b = self.project_point(w2, apron_y, -l2)
+            c_sw_b = self.project_point(-w2, apron_y, -l2)
+            if c_se_b and c_sw_b:
+                front_apron = np.array([
+                    [c_sw[0], c_sw[1]],
+                    [c_se[0], c_se[1]],
+                    [c_se_b[0], c_se_b[1]],
+                    [c_sw_b[0], c_sw_b[1]],
+                ], np.int32)
+                cv2.fillPoly(frame, [front_apron], (115, 60, 10))
+
+            # Crisp white border lines
+            cv2.polylines(frame, [table_pts], True, (250, 250, 250), 3)
+
+            # White center dividing line along Z
+            m_near = self.project_point(0.0, y, -l2)
+            m_far = self.project_point(0.0, y, l2)
+            if m_near and m_far:
+                cv2.line(frame, (m_near[0], m_near[1]), (m_far[0], m_far[1]), (250, 250, 250), 2)
+
+    def _render_net(self, frame: np.ndarray):
+        """Render 3D table tennis net with mesh and top cord."""
+        overhang = self.table_config.half_width + self.table_config.NET_OVERHANG
+        ny = self.table_config.SURFACE_Y + self.table_config.NET_HEIGHT
+
+        # Net 4 corners at Z = 0
+        n_bl = self.project_point(-overhang, 0.0, 0.0)
+        n_br = self.project_point(overhang, 0.0, 0.0)
+        n_tr = self.project_point(overhang, ny, 0.0)
+        n_tl = self.project_point(-overhang, ny, 0.0)
+
+        if n_bl and n_br and n_tr and n_tl:
+            net_pts = np.array([
+                [n_bl[0], n_bl[1]],
+                [n_br[0], n_br[1]],
+                [n_tr[0], n_tr[1]],
+                [n_tl[0], n_tl[1]],
+            ], np.int32)
+
+            # Semi-transparent dark mesh
+            overlay = frame.copy()
+            cv2.fillPoly(overlay, [net_pts], (60, 60, 60))
+            cv2.addWeighted(overlay, 0.65, frame, 0.35, 0, frame)
+
+            # White top tape
+            cv2.line(frame, (n_tl[0], n_tl[1]), (n_tr[0], n_tr[1]), (255, 255, 255), 3)
+            # Net posts
+            cv2.line(frame, (n_bl[0], n_bl[1]), (n_tl[0], n_tl[1]), (50, 50, 50), 4)
+            cv2.line(frame, (n_br[0], n_br[1]), (n_tr[0], n_tr[1]), (50, 50, 50), 4)
+
+    def _render_shadows(self, frame: np.ndarray, ball: Ball):
+        """Render soft circular shadow under ball to enhance 3D perception."""
+        # Shadow on table surface (Y = 0)
+        shadow_proj = self.project_point(ball.x, 0.0, ball.z)
+        if shadow_proj:
+            sx, sy, sz = shadow_proj
+            # Scale shadow by ball height (higher ball = larger, dimmer shadow)
+            base_r = int(22.0 / sz)
+            height_scale = max(0.5, 1.0 - (ball.y * 0.4))
+            r = max(3, int(base_r * height_scale))
+
+            # Draw translucent shadow ellipse
+            overlay = frame.copy()
+            cv2.ellipse(overlay, (sx, sy), (r, int(r * 0.45)), 0, 0, 360, (20, 20, 20), -1)
+            alpha = max(0.2, min(0.6, 0.7 - ball.y * 0.3))
+            cv2.addWeighted(overlay, alpha, frame, 1.0 - alpha, 0, frame)
+
+    def _render_ball_trail(self, frame: np.ndarray, ball: Ball):
+        """Render speed motion blur trail."""
+        for i, pos in enumerate(ball.trail):
+            proj = self.project_point(pos[0], pos[1], pos[2])
+            if proj:
+                alpha = (i + 1) / len(ball.trail)
+                r = max(2, int((16.0 / proj[2]) * alpha * 0.7))
+                color = (0, int(160 * alpha), int(255 * alpha))  # Vibrant yellow-orange
+                cv2.circle(frame, (proj[0], proj[1]), r, color, -1)
+
+    def _render_ball(self, frame: np.ndarray, ball: Ball):
+        """Render 3D table tennis ball with 3D spherical shading."""
+        ball_proj = self.project_point(ball.x, ball.y, ball.z)
+        if ball_proj:
+            bx, by, bz = ball_proj
+            # Apparent radius scales with distance
+            radius = max(4, int(28.0 / bz))
+
+            # Ball base color (vibrant ITTF orange BGR: 0, 140, 255)
+            cv2.circle(frame, (bx, by), radius, (0, 140, 255), -1)
+            # Edge shading
+            cv2.circle(frame, (bx, by), radius, (0, 90, 200), 2)
+            # Specular light highlight
+            highlight_x = int(bx - radius * 0.3)
+            highlight_y = int(by - radius * 0.3)
+            highlight_r = max(2, int(radius * 0.35))
+            cv2.circle(frame, (highlight_x, highlight_y), highlight_r, (255, 255, 255), -1)
+
+    def _render_paddle(self, frame: np.ndarray, paddle: Paddle, is_player: bool):
+        """Render 3D paddle with rubber face, border rim and wooden handle."""
+        proj = self.project_point(paddle.x, paddle.y, paddle.z)
+        if not proj:
+            return
+
+        px, py, pz = proj
+        blade_r = max(8, int(60.0 / pz))
+
+        # Color: Player has Red rubber, AI has Black rubber
+        rubber_color = (35, 35, 225) if is_player else (40, 40, 40)
+        rim_color = (240, 240, 240) if is_player else (180, 180, 180)
+        handle_color = (90, 120, 160)  # Wood
+
+        # Handle
+        handle_len = int(blade_r * 1.0)
+        handle_w = max(4, int(blade_r * 0.28))
+        handle_end_y = py + handle_len if is_player else py - handle_len
+        cv2.line(frame, (px, py + int(blade_r * 0.4)), (px, handle_end_y), handle_color, handle_w)
+
+        # Paddle blade circular disc
+        cv2.circle(frame, (px, py), blade_r, rubber_color, -1)
+        cv2.circle(frame, (px, py), blade_r, rim_color, max(1, int(blade_r * 0.08)))
+
+        # Label tag above paddle
+        tag = "YOU" if is_player else "AI"
+        cv2.putText(
+            frame,
+            tag,
+            (px - 14, py - blade_r - 8),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            2,
+        )
+
+    def _render_hud(self, frame: np.ndarray, game_state: GameStateMachine):
+        """Wii Sports style scoreboard, announcement banner, and rally counter."""
+        w = self.width
+
+        # Top Scoreboard Banner (Semi-transparent dark rounded bar)
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (20, 15), (w - 20, 75), (20, 20, 25), -1)
+        cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
+        cv2.rectangle(frame, (20, 15), (w - 20, 75), (255, 255, 255), 2)
+
+        # Player Score
+        p_score_text = f"PLAYER: {game_state.player_score}"
+        cv2.putText(frame, p_score_text, (45, 52), cv2.FONT_HERSHEY_DUPLEX, 0.9, (0, 230, 255), 2)
+        if game_state.server == "PLAYER":
+            cv2.circle(frame, (32, 45), 7, (0, 165, 255), -1)  # Serve ball indicator
+
+        # AI Score
+        ai_score_text = f"AI ({game_state.difficulty}): {game_state.ai_score}"
+        cv2.putText(frame, ai_score_text, (w - 320, 52), cv2.FONT_HERSHEY_DUPLEX, 0.9, (255, 120, 120), 2)
+        if game_state.server == "AI":
+            cv2.circle(frame, (w - 333, 45), 7, (0, 165, 255), -1)
+
+        # Rally Counter in Center of Scoreboard
+        rally_text = f"RALLY: {game_state.current_rally_count}"
+        cv2.putText(frame, rally_text, (int(w / 2) - 65, 52), cv2.FONT_HERSHEY_DUPLEX, 0.75, (255, 255, 255), 2)
+
+        # Wii Sports Center Announcement Banner
+        if game_state.announcement and game_state.announcement_timer > 0:
+            banner_text = game_state.announcement
+            # Font scale
+            scale = 0.85
+            thickness = 2
+            (text_w, text_h), baseline = cv2.getTextSize(
+                banner_text, cv2.FONT_HERSHEY_DUPLEX, scale, thickness
+            )
+
+            cx = int(w / 2)
+            cy = 135
+            bx1 = cx - int(text_w / 2) - 20
+            by1 = cy - text_h - 12
+            bx2 = cx + int(text_w / 2) + 20
+            by2 = cy + 12
+
+            overlay2 = frame.copy()
+            cv2.rectangle(overlay2, (bx1, by1), (bx2, by2), (0, 40, 140), -1)  # Wii blue
+            cv2.addWeighted(overlay2, 0.85, frame, 0.15, 0, frame)
+            cv2.rectangle(frame, (bx1, by1), (bx2, by2), (255, 220, 0), 2)
+
+            cv2.putText(
+                frame,
+                banner_text,
+                (cx - int(text_w / 2), cy),
+                cv2.FONT_HERSHEY_DUPLEX,
+                scale,
+                (255, 255, 255),
+                thickness,
+            )

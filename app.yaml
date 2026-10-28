@@ -1,0 +1,19 @@
+# Databricks Apps deployment configuration
+command:
+  - "streamlit"
+  - "run"
+  - "app.py"
+  - "--server.port"
+  - "8501"
+  - "--server.address"
+  - "0.0.0.0"
+  - "--server.headless"
+  - "true"
+  - "--server.enableCORS"
+  - "false"
+
+env:
+  - name: "DATABRICKS_APP_NAME"
+    value: "ai-ping-pong"
+  - name: "STREAMLIT_THEME_BASE"
+    value: "dark"
