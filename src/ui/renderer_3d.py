@@ -329,12 +329,12 @@ class PerspectiveRenderer3D:
                 line_color = (0, 255, 120) if is_in_reach else (60, 60, 255)
                 cv2.line(frame, (p_proj[0], p_proj[1]), (b_proj[0], b_proj[1]), line_color, 2)
 
-        # 2. Discrete Status & Instruction Pill in Top-Left Corner (completely away from paddle and table)
-        pill_x, pill_y = 25, 88
-        pill_w, pill_h = 320, 32
-
-        if game_state.status == MatchStatus.READY:
-            msg = "FECHE A MAO PARA INICIAR O JOGO"
+        # 2. Discrete Status & Instruction Pill in Top-Left Corner (clean, fixed, never blocks play)
+        if game_state.announcement and game_state.announcement_timer > 0:
+            msg = game_state.announcement
+            color = (0, 230, 255)
+        elif game_state.status == MatchStatus.READY:
+            msg = "FECHE A MAO PARA INICIAR"
             color = (0, 230, 255)
         elif game_state.status == MatchStatus.SERVING and game_state.server == "PLAYER":
             msg = "SAQUE: GOLPEIE COM FORCA DO BRACO!"
@@ -361,75 +361,90 @@ class PerspectiveRenderer3D:
             color = (200, 200, 200)
 
         if msg:
+            (tw, th), _ = cv2.getTextSize(msg, cv2.FONT_HERSHEY_SIMPLEX, 0.44, 1)
+            pill_w = max(240, tw + 45)
+            pill_x, pill_y = 20, 75
+            pill_h = 30
+
             overlay = frame.copy()
-            cv2.rectangle(overlay, (pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h), (20, 25, 35), -1)
-            cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
-            cv2.rectangle(frame, (pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h), (255, 255, 255), 1)
-            cv2.circle(frame, (pill_x + 14, pill_y + int(pill_h / 2)), 4, color, -1)
+            cv2.rectangle(overlay, (pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h), (16, 20, 30), -1)
+            cv2.addWeighted(overlay, 0.80, frame, 0.20, 0, frame)
+            cv2.rectangle(frame, (pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h), color, 1)
+            cv2.circle(frame, (pill_x + 13, pill_y + int(pill_h / 2)), 4, color, -1)
             cv2.putText(
                 frame,
                 msg,
-                (pill_x + 26, pill_y + 21),
+                (pill_x + 26, pill_y + 20),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.42,
+                0.44,
                 color,
                 1,
             )
 
     def _render_hud(self, frame: np.ndarray, game_state: GameStateMachine):
-        """Wii Sports style scoreboard, announcement banner, and rally counter."""
+        """Broadcast-style TV scorebug (clean floating scoreboard without obscuring table)."""
         w = self.width
+        cx = int(w / 2)
+        sb_w, sb_h = 420, 44
+        sb_x = cx - int(sb_w / 2)
+        sb_y = 14
 
-        # Top Scoreboard Banner (Semi-transparent dark rounded bar)
+        # 1. Subtle drop shadow
+        shadow = frame.copy()
+        cv2.rectangle(shadow, (sb_x + 2, sb_y + 2), (sb_x + sb_w + 2, sb_y + sb_h + 2), (10, 10, 15), -1)
+        cv2.addWeighted(shadow, 0.40, frame, 0.60, 0, frame)
+
+        # 2. Main glass container
         overlay = frame.copy()
-        cv2.rectangle(overlay, (20, 15), (w - 20, 75), (20, 20, 25), -1)
-        cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
-        cv2.rectangle(frame, (20, 15), (w - 20, 75), (255, 255, 255), 2)
+        cv2.rectangle(overlay, (sb_x, sb_y), (sb_x + sb_w, sb_y + sb_h), (16, 20, 28), -1)
+        cv2.addWeighted(overlay, 0.88, frame, 0.12, 0, frame)
+        cv2.rectangle(frame, (sb_x, sb_y), (sb_x + sb_w, sb_y + sb_h), (60, 75, 95), 1)
 
-        # Player Score
-        p_score_text = f"VOCE: {game_state.player_score}"
-        cv2.putText(frame, p_score_text, (45, 52), cv2.FONT_HERSHEY_DUPLEX, 0.9, (0, 230, 255), 2)
+        # 3. Left Pod: Player ("VOCE")
+        p_pod_w = 160
+        # Cyan accent stripe
+        cv2.rectangle(frame, (sb_x, sb_y), (sb_x + 4, sb_y + sb_h), (255, 215, 0), -1)
+        # Player name
+        cv2.putText(frame, "VOCE", (sb_x + 14, sb_y + 28), cv2.FONT_HERSHEY_DUPLEX, 0.54, (255, 255, 255), 1)
+        # Serve indicator
         if game_state.server == "PLAYER":
-            cv2.circle(frame, (32, 45), 7, (0, 165, 255), -1)  # Serve ball indicator
+            cv2.circle(frame, (sb_x + 68, sb_y + 23), 5, (0, 165, 255), -1)
+            cv2.circle(frame, (sb_x + 68, sb_y + 23), 7, (255, 255, 255), 1)
 
-        # Roberval Score
-        roberval_score_text = f"ROBERVAL ({game_state.difficulty}): {game_state.ai_score}"
-        cv2.putText(frame, roberval_score_text, (w - 380, 52), cv2.FONT_HERSHEY_DUPLEX, 0.85, (255, 120, 120), 2)
+        # Player Digital Score Box
+        cv2.rectangle(frame, (sb_x + p_pod_w - 42, sb_y + 4), (sb_x + p_pod_w - 4, sb_y + sb_h - 4), (30, 42, 58), -1)
+        cv2.rectangle(frame, (sb_x + p_pod_w - 42, sb_y + 4), (sb_x + p_pod_w - 4, sb_y + sb_h - 4), (0, 200, 255), 1)
+        p_score_str = str(game_state.player_score)
+        p_score_x = sb_x + p_pod_w - 30 if len(p_score_str) == 1 else sb_x + p_pod_w - 36
+        cv2.putText(frame, p_score_str, (p_score_x, sb_y + 31), cv2.FONT_HERSHEY_DUPLEX, 0.75, (0, 235, 255), 2)
+
+        # 4. Center Pod: Rally Counter (Width 100)
+        c_pod_x = sb_x + p_pod_w
+        cv2.line(frame, (c_pod_x, sb_y + 6), (c_pod_x, sb_y + sb_h - 6), (45, 55, 70), 1)
+        cv2.putText(frame, "RALLY", (c_pod_x + 28, sb_y + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 215, 255), 1)
+        rally_str = str(game_state.current_rally_count)
+        r_text_x = c_pod_x + 44 if len(rally_str) == 1 else c_pod_x + 38
+        cv2.putText(frame, rally_str, (r_text_x, sb_y + 36), cv2.FONT_HERSHEY_DUPLEX, 0.58, (255, 255, 255), 1)
+        c_pod_end = c_pod_x + 100
+        cv2.line(frame, (c_pod_end, sb_y + 6), (c_pod_end, sb_y + sb_h - 6), (45, 55, 70), 1)
+
+        # 5. Right Pod: Roberval
+        r_pod_x = c_pod_end
+        # Roberval Digital Score Box
+        cv2.rectangle(frame, (r_pod_x + 4, sb_y + 4), (r_pod_x + 42, sb_y + sb_h - 4), (50, 28, 34), -1)
+        cv2.rectangle(frame, (r_pod_x + 4, sb_y + 4), (r_pod_x + 42, sb_y + sb_h - 4), (255, 90, 100), 1)
+        r_score_str = str(game_state.ai_score)
+        r_score_x = r_pod_x + 16 if len(r_score_str) == 1 else r_pod_x + 10
+        cv2.putText(frame, r_score_str, (r_score_x, sb_y + 31), cv2.FONT_HERSHEY_DUPLEX, 0.75, (120, 140, 255), 2)
+
+        # Serve indicator for Roberval
         if game_state.server in ("AI", "ROBERVAL"):
-            cv2.circle(frame, (w - 395, 45), 7, (0, 165, 255), -1)
+            cv2.circle(frame, (r_pod_x + 54, sb_y + 23), 5, (0, 165, 255), -1)
+            cv2.circle(frame, (r_pod_x + 54, sb_y + 23), 7, (255, 255, 255), 1)
 
-        # Rally Counter in Center of Scoreboard
-        rally_text = f"RALLY: {game_state.current_rally_count}"
-        cv2.putText(frame, rally_text, (int(w / 2) - 65, 52), cv2.FONT_HERSHEY_DUPLEX, 0.75, (255, 255, 255), 2)
+        # Roberval name
+        r_name_x = r_pod_x + 68 if game_state.server in ("AI", "ROBERVAL") else r_pod_x + 52
+        cv2.putText(frame, "ROBERVAL", (r_name_x, sb_y + 28), cv2.FONT_HERSHEY_DUPLEX, 0.50, (255, 255, 255), 1)
 
-        # Wii Sports Center Announcement Banner
-        if game_state.announcement and game_state.announcement_timer > 0:
-            banner_text = game_state.announcement
-            # Font scale
-            scale = 0.85
-            thickness = 2
-            (text_w, text_h), baseline = cv2.getTextSize(
-                banner_text, cv2.FONT_HERSHEY_DUPLEX, scale, thickness
-            )
-
-            cx = int(w / 2)
-            cy = 135
-            bx1 = cx - int(text_w / 2) - 20
-            by1 = cy - text_h - 12
-            bx2 = cx + int(text_w / 2) + 20
-            by2 = cy + 12
-
-            overlay2 = frame.copy()
-            cv2.rectangle(overlay2, (bx1, by1), (bx2, by2), (0, 40, 140), -1)  # Wii blue
-            cv2.addWeighted(overlay2, 0.85, frame, 0.15, 0, frame)
-            cv2.rectangle(frame, (bx1, by1), (bx2, by2), (255, 220, 0), 2)
-
-            cv2.putText(
-                frame,
-                banner_text,
-                (cx - int(text_w / 2), cy),
-                cv2.FONT_HERSHEY_DUPLEX,
-                scale,
-                (255, 255, 255),
-                thickness,
-            )
+        # Red accent stripe on right edge
+        cv2.rectangle(frame, (sb_x + sb_w - 4, sb_y), (sb_x + sb_w, sb_y + sb_h), (60, 60, 235), -1)
