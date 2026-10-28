@@ -34,20 +34,23 @@ def test_gesture_classifier():
     # Forehand swing (positive vx for right-handed)
     fh_v = np.array([3.5, 0.5, 0.5])
     res_fh = classifier.classify(fh_v, accel)
-    assert res_fh.stroke_type == "FOREHAND"
+    assert "FOREHAND" in res_fh.stroke_type
     assert res_fh.is_active_swing is True
+    assert res_fh.is_hook_swing is True
 
     # Backhand swing (negative vx for right-handed)
     bh_v = np.array([-3.5, 0.5, 0.5])
     res_bh = classifier.classify(bh_v, accel)
-    assert res_bh.stroke_type == "BACKHAND"
+    assert "BACKHAND" in res_bh.stroke_type
     assert res_bh.is_active_swing is True
+    assert res_bh.is_hook_swing is True
 
     # Power smash (high speed, downward vy)
     smash_v = np.array([1.0, -2.5, 7.0])
     res_smash = classifier.classify(smash_v, accel)
-    assert res_smash.stroke_type == "SMASH"
+    assert "SMASH" in res_smash.stroke_type
     assert res_smash.is_active_swing is True
+    assert res_smash.is_hook_swing is True
 
 
 def test_hand_tracker_with_frame():

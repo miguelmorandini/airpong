@@ -167,31 +167,57 @@ class PhysicsEngine:
         ball.y += ball.vy * dt
         ball.z += ball.vz * dt
 
-        # 2. Check Paddle Collisions (Solid Racket Interception & Block Mode)
-        # Player Paddle: Automatic bounce on racket interception
+        # 2. Check Paddle Collisions (Hook Stroke / Gancho & Interception)
+        # Player Paddle: Hook Swing motion from hand/arm or block interception
         if ball.vz < 0.0 and ball.z <= -1.20:
             dx = ball.x - player_paddle.x
             dy = ball.y - player_paddle.y
             radial_dist = math.sqrt(dx * dx + dy * dy)
             z_dist = abs(ball.z - player_paddle.z)
 
-            # Hit connects if ball is within racket disc + generous margin
-            if radial_dist <= 0.40 and z_dist <= 0.35:
-                # Rebound ball forward with reliable net-clearing arc
-                forward_speed = max(3.2, min(5.5, abs(ball.vz) * 0.95 + abs(player_paddle.vz) * 0.6))
-                ball.vz = forward_speed
-                ball.vy = max(1.9, min(2.8, abs(ball.vy) * 0.6 + 1.4))
-                # Angle towards opponent table based on strike position on blade
-                ball.vx = np.clip(0.4 * ball.vx + (ball.x - player_paddle.x) * 2.5 + player_paddle.vx * 0.5, -1.8, 1.8)
+            # Check if player performed a hook swing (movimento de gancho)
+            swing_speed = player_paddle.speed
+            is_hook = (swing_speed >= 1.05)
+            max_reach = 0.48 if is_hook else 0.40
+
+            # Hit connects if ball is within reach
+            if radial_dist <= max_reach and z_dist <= 0.38:
+                if is_hook:
+                    # Dynamic Hook Stroke: Transfer arm/wrist momentum
+                    if player_paddle.vy < -0.8 or swing_speed > 4.5:
+                        shot_type = "GANCHO SMASH"
+                        forward_speed = 5.4
+                        ball.vy = 1.4
+                    elif player_paddle.vx > 0.8:
+                        shot_type = "GANCHO FOREHAND"
+                        forward_speed = 3.8 + swing_speed * 0.25
+                        ball.vy = 2.4
+                        ball.spin_x = 8.0  # Topspin
+                    elif player_paddle.vx < -0.8:
+                        shot_type = "GANCHO BACKHAND"
+                        forward_speed = 3.6 + swing_speed * 0.20
+                        ball.vy = 2.4
+                        ball.spin_x = 6.0
+                    else:
+                        shot_type = "GANCHO DRIVE"
+                        forward_speed = 3.6 + swing_speed * 0.20
+                        ball.vy = 2.3
+
+                    ball.vz = forward_speed
+                    ball.vx = np.clip(0.4 * ball.vx + player_paddle.vx * 0.75 + (ball.x - player_paddle.x) * 1.5, -1.8, 1.8)
+                else:
+                    # Clean passive block
+                    shot_type = "BLOQUEIO"
+                    ball.vz = 3.2
+                    ball.vy = 2.2
+                    ball.vx = np.clip(0.3 * ball.vx + (ball.x - player_paddle.x) * 2.0, -1.6, 1.6)
 
                 ball.last_hitter = "PLAYER"
                 ball.bounce_count_current_hit = 0
                 ball.bounced_player_side = False
                 ball.bounced_ai_side = False
                 ball.is_serve = False
-                ball.spin_x = player_paddle.vy * 2.0
 
-                shot_type = "SMASH" if player_paddle.speed > 5.0 else "BLOCK/RETURN"
                 events.append(PhysicsEvent(
                     event_type="HIT",
                     hitter="PLAYER",

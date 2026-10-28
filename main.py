@@ -122,7 +122,8 @@ def run_desktop_app():
             game.update(dt=dt)
 
             if game.current_rally_count > prev_rally:
-                sounds.trigger_hit_spark(400, 320, "DRIVE")
+                shot_type = game.current_shot.shot_type if game.current_shot else "DRIVE"
+                sounds.trigger_hit_spark(400, 320, shot_type)
             elif game.ball.bounce_count_current_hit > prev_bounces:
                 sounds.play_bounce()
 
@@ -144,7 +145,7 @@ def run_desktop_app():
             )
 
             # 7. Render Controls Legend on Bottom Left
-            control_hint = "GESTO: FECHE A MAO OU [ESPACO] P/ SACAR | APENAS POSICIONE A MAO NA BOLA"
+            control_hint = "SAQUE: FECHE A MAO ✊ | REBATER: MOVIMENTO DE GANCHO COM O BRACO 🏓"
             cv2.putText(
                 scene_frame,
                 control_hint,

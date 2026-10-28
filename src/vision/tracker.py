@@ -233,7 +233,15 @@ class HandTracker:
             2,
         )
 
-        idle_gesture = GestureResult("IDLE", 0.0, 0.0, False, 1.0)
+        idle_gesture = GestureResult(
+            stroke_type="IDLE",
+            swing_speed=0.0,
+            swing_speed_kmh=0.0,
+            is_active_swing=False,
+            is_hook_swing=False,
+            hook_power=1.0,
+            confidence=1.0,
+        )
         return HandTrackingResult(
             detected=False,
             world_x=self.prev_x,
