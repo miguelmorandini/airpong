@@ -25,12 +25,12 @@ class PerspectiveRenderer3D:
         self.width = self.config.CANVAS_WIDTH
         self.height = self.config.CANVAS_HEIGHT
 
-        # Camera placement: Behind player, slightly above table looking forward
+        # Camera placement: Wii Sports 3D perspective looking down at table
         self.cam_x = 0.0
-        self.cam_y = 0.72
-        self.cam_z = -2.60
-        self.cam_pitch = math.radians(14.0)  # Looking down 14 degrees
-        self.fov = math.radians(58.0)
+        self.cam_y = 1.25
+        self.cam_z = -3.50
+        self.cam_pitch = math.radians(-18.0)  # Looking down 18 degrees
+        self.fov = math.radians(48.0)
         self.focal_length = (self.width / 2.0) / math.tan(self.fov / 2.0)
 
     def project_point(self, x: float, y: float, z: float) -> Optional[Tuple[int, int, float]]:
@@ -113,10 +113,10 @@ class PerspectiveRenderer3D:
     def _render_floor(self, frame: np.ndarray):
         """Render wooden stadium floor with court lines."""
         # Project floor quad
-        p1 = self.project_point(-3.5, -0.76, -1.8)
-        p2 = self.project_point(3.5, -0.76, -1.8)
-        p3 = self.project_point(3.5, -0.76, 3.5)
-        p4 = self.project_point(-3.5, -0.76, 3.5)
+        p1 = self.project_point(-5.0, -0.76, -3.2)
+        p2 = self.project_point(5.0, -0.76, -3.2)
+        p3 = self.project_point(5.0, -0.76, 4.5)
+        p4 = self.project_point(-5.0, -0.76, 4.5)
 
         if p1 and p2 and p3 and p4:
             pts = np.array([[p1[0], p1[1]], [p2[0], p2[1]], [p3[0], p3[1]], [p4[0], p4[1]]], np.int32)

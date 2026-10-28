@@ -8,6 +8,7 @@ import numpy as np
 from src.config import CameraConfig, DisplayConfig
 from src.engine.game_state import GameStateMachine, MatchStatus
 from src.ui.renderer_3d import PerspectiveRenderer3D
+from src.ui.sound_effects import SoundEffectsManager
 from src.vision.camera import WebcamSource, SyntheticCameraSource
 from src.vision.tracker import HandTracker
 from src.databricks.storage import get_storage
@@ -34,6 +35,7 @@ def run_desktop_app():
     game = GameStateMachine(difficulty="MEDIUM")
     renderer = PerspectiveRenderer3D()
     tracker = HandTracker()
+    sounds = SoundEffectsManager()
 
     # Mouse state
     mouse_pos = [0.0, 0.20]  # [world_x, world_y]
@@ -102,10 +104,19 @@ def run_desktop_app():
                     game.player_paddle.vz = 8.0
 
             # 4. Step game simulation
+            prev_rally = game.current_rally_count
+            prev_bounces = game.ball.bounce_count_current_hit
+
             game.update(dt=dt)
+
+            if game.current_rally_count > prev_rally:
+                sounds.trigger_hit_spark(400, 320, "DRIVE")
+            elif game.ball.bounce_count_current_hit > prev_bounces:
+                sounds.play_bounce()
 
             # 5. Render 3D Perspective game world
             scene_frame = renderer.render_frame(game)
+            sounds.update_and_render(scene_frame, dt)
 
             # 6. Composite Camera HUD (Bottom Right Corner)
             cam_view = cv2.resize(track_res.annotated_frame, (260, 195))

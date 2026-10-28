@@ -262,8 +262,8 @@ let aiPaddle = {{ x: 0, y: 0.20, z: 1.65, vx: 0, vy: 0, radius: 0.25 }};
 let mouseX = 450, mouseY = 400;
 let prevMouseX = 450, prevMouseY = 400;
 
-// Camera 3D Perspective Projection
-const CAM = {{ x: 0, y: 0.72, z: -2.60, fov: 58 * Math.PI / 180, pitch: 14 * Math.PI / 180 }};
+// Camera 3D Perspective Projection (Calibrated Wii Sports Angle)
+const CAM = {{ x: 0, y: 1.25, z: -3.50, fov: 48 * Math.PI / 180, pitch: -18 * Math.PI / 180 }};
 const FOCAL = (canvas.width / 2) / Math.tan(CAM.fov / 2);
 
 function project(x, y, z) {{
@@ -486,10 +486,10 @@ function render() {{
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // 1. Gymnasium Floor
-    const fl1 = project(-3.2, -0.76, -1.8);
-    const fl2 = project(3.2, -0.76, -1.8);
-    const fl3 = project(3.2, -0.76, 3.2);
-    const fl4 = project(-3.2, -0.76, 3.2);
+    const fl1 = project(-5.0, -0.76, -3.2);
+    const fl2 = project(5.0, -0.76, -3.2);
+    const fl3 = project(5.0, -0.76, 4.5);
+    const fl4 = project(-5.0, -0.76, 4.5);
     if (fl1 && fl2 && fl3 && fl4) {{
         ctx.fillStyle = "#c5d7ed";
         ctx.beginPath();
