@@ -140,19 +140,10 @@ class TableTennisAI:
             new_x, new_y, new_z = self.target_x, self.target_y, self.target_z
 
         # Swing impulse when ball enters strike range
-        if 1.25 <= ball.z <= 1.65 and ball.vz > 0:
-            # Strike forward towards player
-            swing_vx = -0.8 if self.rng.random() < self.difficulty.corner_aim_tendency else 0.4
-            # Add smash velocity if ball is high
-            if ball.y > 0.25 and self.rng.random() < self.difficulty.smash_probability:
-                swing_vy = -1.5
-                swing_vz = -8.0
-            else:
-                swing_vy = 0.8
-                swing_vz = -5.0
-
-            ai_paddle.vx = swing_vx
-            ai_paddle.vy = swing_vy
-            ai_paddle.vz = swing_vz
+        if 1.20 <= ball.z <= 1.65 and ball.vz > 0:
+            # Lift ball up and forward towards player with clean arc
+            ai_paddle.vx = -0.3 if self.rng.random() < self.difficulty.corner_aim_tendency else 0.3
+            ai_paddle.vy = 2.8
+            ai_paddle.vz = -3.4
         else:
             ai_paddle.update_position(new_x, new_y, new_z, dt)

@@ -201,17 +201,19 @@ class PhysicsEngine:
                     details=shot_type,
                 ))
 
-        # AI Paddle: Interception and return
+        # AI Paddle: Clean arc return that reliably reaches player's table and racket
         elif ball.vz > 0.0 and ball.z >= 1.20:
             dx = ball.x - ai_paddle.x
             dy = ball.y - ai_paddle.y
             radial_dist = math.sqrt(dx * dx + dy * dy)
             z_dist = abs(ball.z - ai_paddle.z)
 
-            if radial_dist <= 0.40 and z_dist <= 0.35:
-                ball.vz = -max(3.0, min(5.0, abs(ball.vz) * 0.95))
-                ball.vy = max(1.9, min(2.8, abs(ball.vy) * 0.6 + 1.4))
-                ball.vx = np.clip(0.4 * ball.vx + (ball.x - ai_paddle.x) * 2.0, -1.8, 1.8)
+            if radial_dist <= 0.45 and z_dist <= 0.35:
+                # Guaranteed high-clearance return: Clears net by 35cm, lands on player side, reaches player
+                ball.vz = -3.4
+                ball.vy = 2.8
+                # Angle aimed towards player table area
+                ball.vx = np.clip(0.3 * ball.vx + (ball.x - ai_paddle.x) * 1.5, -0.6, 0.6)
 
                 ball.last_hitter = "AI"
                 ball.bounce_count_current_hit = 0

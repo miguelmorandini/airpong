@@ -204,29 +204,22 @@ class GameStateMachine:
                 self.current_shot.landing_x = event.position[0]
                 self.current_shot.landing_z = event.position[2]
 
-            # In a serve, ball MUST bounce on server side then receiver side
+            # Table bounce handling: In arcade play, serve simply lands on opponent's table
             if self.ball.is_serve:
-                if self.ball.bounce_count_current_hit == 1:
-                    # First bounce must be on server's side
-                    server_side = "PLAYER" if self.server == "PLAYER" else "AI"
-                    if event.details != server_side:
-                        self.ball.in_play = False
-                        self._award_point("AI" if self.server == "PLAYER" else "PLAYER", "FAULT: SERVE DID NOT BOUNCE ON OWN SIDE")
-                elif self.ball.bounce_count_current_hit == 2:
-                    # Second bounce must be on opponent's side
-                    opponent_side = "AI" if self.server == "PLAYER" else "PLAYER"
-                    if event.details != opponent_side:
-                        self.ball.in_play = False
-                        self._award_point("AI" if self.server == "PLAYER" else "PLAYER", "FAULT: SERVE MISSED OPPONENT TABLE")
-                    else:
-                        # Successful serve transition into open rally
-                        self.ball.is_serve = False
+                opponent_side = "AI" if self.server == "PLAYER" else "PLAYER"
+                if event.details == opponent_side:
+                    # Successful serve: Open rally begins!
+                    self.ball.is_serve = False
+                    self.ball.bounce_count_current_hit = 1
+                elif event.details == ("PLAYER" if self.server == "PLAYER" else "AI"):
+                    # Bounced on own side first (classical serve)
+                    pass
             else:
-                # Regular rally: if ball bounces twice on one side without being hit, point goes to opponent
+                # Regular rally: if ball bounces twice on the same side without being hit -> Point to opponent!
                 if self.ball.bounce_count_current_hit >= 2:
                     self.ball.in_play = False
                     scoring_party = "PLAYER" if event.details == "AI" else "AI"
-                    self._award_point(scoring_party, "DOUBLE BOUNCE!")
+                    self._award_point(scoring_party, "DOIS QUIQUES!")
 
         elif event.event_type == "NET_FAULT":
             self.ball.in_play = False
