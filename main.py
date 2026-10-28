@@ -1,5 +1,6 @@
 """AI Ping Pong - Standalone Desktop Runner (60 FPS Native OpenCV Window with Mouse & Webcam)."""
 
+import math
 import sys
 import time
 import cv2
