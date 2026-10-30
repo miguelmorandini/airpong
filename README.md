@@ -1,68 +1,85 @@
-# 🏓 AI Ping Pong
+# 🏓 AirPong — AI Table Tennis 3D
 
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live%20Demo-success?logo=github)](https://miguelmorandini.github.io/airpong/)
+[![CI](https://github.com/miguelmorandini/airpong/actions/workflows/ci.yml/badge.svg)](https://github.com/miguelmorandini/airpong/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python)](https://python.org)
 [![Databricks Apps](https://img.shields.io/badge/Databricks-Apps%20%26%20Delta%20Lake-FF3621?logo=databricks)](https://www.databricks.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.35+-FF4B4B?logo=streamlit)](https://streamlit.io)
 [![OpenCV](https://img.shields.io/badge/OpenCV-Computer%20Vision-5C3EE8?logo=opencv)](https://opencv.org)
 [![MediaPipe](https://img.shields.io/badge/MediaPipe-60%20FPS%20Hand%20Tracking-00A389?logo=google)](https://developers.google.com/mediapipe)
-[![Tests](https://img.shields.io/badge/Tests-49%20Passed%20%28100%25%29-brightgreen)](#testes-automatizados)
+[![Tests](https://img.shields.io/badge/Tests-49%20Passed%20%28100%25%29-brightgreen)](#automated-testing)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**AI Ping Pong** é um jogo de tênis de mesa em perspectiva 3D inspirado no clássico **Wii Sports**, controlado em tempo real pelos movimentos da mão capturados pela webcam, com adversário controlado por Inteligência Artificial, motor de física avançado (aerodinâmica, quiques ITTF e efeito Magnus/spin), interface em **Streamlit** e arquitetura pronta para implantação no **Databricks Apps** com persistência analítica em tabelas **Delta Lake**.
+**AirPong** is a 3D table tennis game inspired by the classic **Wii Sports**, powered by real-time webcam hand tracking and computer vision, an intelligent AI opponent (**Roberval**), an advanced ITTF-grade physics engine (aerodynamics, Magnus spin, bounce coefficients), a **Streamlit** telemetry dashboard, and native deployment support for **Databricks Apps** with **Delta Lake** analytical storage.
 
----
-
-## 🌟 Principais Funcionalidades
-
-1. **Controle por Visão Computacional (MediaPipe Hands & OpenCV)**:
-   - Rastreamento dos 21 landmarks da mão a 60 FPS.
-   - Estimativa de profundidade ($Z$) baseada na escala métrica da mão no campo visual.
-   - Cálculo vetorial da velocidade do swing ($\Delta \vec{p} / \Delta t$) com suavização exponencial (EMA) para eliminação de ruído.
-   - Classificação automática de golpes: **Forehand**, **Backhand**, **Power Smash** e **Drive**.
-
-2. **Motor de Física 3D & Regras Oficiais ITTF**:
-   - Geometria oficial da mesa ITTF (2,74 m de comprimento $\times$ 1,525 m de largura $\times$ 0,1525 m de altura de rede).
-   - Resistência do ar aerodinâmica (arrasto quadrático) e gravidade contínua.
-   - **Efeito Magnus (Spin)**: topspin que faz a bola mergulhar, backspin para sustentação e sidespin para desvios laterais.
-   - Regras oficiais: sets de 11 pontos, vantagem mínima de 2 pontos (deuce), alternância de saque a cada 2 pontos (ou 1 ponto no deuce) e detecção de faltas de rede e mesa.
-
-3. **Adversário Inteligente (IA)**:
-   - 4 níveis de dificuldade configuráveis: **EASY**, **MEDIUM**, **HARD** e **CHAMPION**.
-   - Predição balística de ponto de interceptação na linha de rebatida.
-   - Variação estocástica de erro e tempo de reação humano simulado.
-
-4. **Estética Inspirada no Wii Sports**:
-   - Projeção de perspectiva 3D realista com iluminação e sombras projetadas.
-   - Rastro de velocidade da bola (*speed trail*), faíscas de impacto e feedbacks visuais em pop-up ("NICE SHOT!", "SMASH!", "OUT!", "DEUCE!").
-   - Placar estilizado com indicador visual do sacador.
-
-5. **Hub Analítico e Telemetria no Databricks**:
-   - Persistência estruturada em tabelas Delta Lake (`ping_pong_matches` e `ping_pong_shots`).
-   - Mapa de calor 2D (*Heatmap*) dos pontos de impacto da bola na mesa.
-   - Gráficos interativos em Plotly para distribuição de tipos de golpe e curvas de aceleração.
-   - Fallback resiliente para SQLite local: funciona 100% mesmo sem credenciais ativas do Databricks.
+It also features a **100% client-side Web build** that runs at 60 FPS directly in any modern browser without installing Python or backend dependencies.
 
 ---
 
-## 🏗️ Arquitetura do Sistema
+## 🌟 Key Features
 
-O projeto adota uma **Arquitetura Híbrida / Multi-Target**, projetada especificamente para contornar as limitações físicas de captura de webcam e latência em contêineres de nuvem:
+1. **Computer Vision & Gesture Control (MediaPipe Hands & OpenCV)**:
+   - Real-time 21-landmark hand tracking at 60 FPS.
+   - Depth ($Z$) estimation derived from metric hand scale variation.
+   - Vector swing velocity calculation ($\Delta \vec{p} / \Delta t$) with Exponential Moving Average (EMA) and 1€ filter smoothing for jitter-free tracking.
+   - Automated stroke classification: **Forehand**, **Backhand**, **Power Smash**, and **Drive**.
+
+2. **3D Physics Engine & Official ITTF Rules**:
+   - Official ITTF table dimensions ($2.74\text{ m} \times 1.525\text{ m} \times 0.1525\text{ m}$ net height).
+   - Quadratic aerodynamic drag, continuous gravity, and coefficient of restitution ($e = 0.89$).
+   - **Magnus Effect (Spin)**: Topspin (diving trajectory), backspin (lift/float), and sidespin (lateral drift).
+   - Official scoring rules: 11-point sets, minimum 2-point advantage (deuce), serve alternations every 2 points (or 1 during deuce), and net/table fault detection.
+
+3. **Intelligent AI Opponent (Roberval)**:
+   - 4 difficulty levels: **EASY**, **MEDIUM**, **HARD**, and **CHAMPION**.
+   - Ballistic prediction of the ball's interception point at the baseline.
+   - Stochastic human-like reaction latency and targeting error simulation.
+
+4. **Wii Sports Arcade Feel & Modern Broadcast Visuals**:
+   - Realistic 3D perspective projection with dynamic court shadows and depth scaling.
+   - Ball speed trail, particle collision sparks, and arcade pop-up alerts ("NICE SHOT!", "SMASH!", "OUT!", "DEUCE!").
+   - Sleek television broadcast scorebug with server indicator, speedometer (km/h), and game state overlays.
+
+5. **Databricks Apps Analytics & Telemetry Hub**:
+   - Structured persistence in Delta Lake tables (`ping_pong_matches` and `ping_pong_shots`).
+   - 2D ball bounce heatmap on the table surface.
+   - Interactive Plotly charts for shot type distribution, rally length, and acceleration curves.
+   - Resilient local SQLite fallback: works 100% offline without active Databricks credentials.
+
+6. **Dataset Mining & Biomechanical ML Agent**:
+   - Automated YouTube mining and synthetic video generator for table tennis strokes.
+   - Kinematic feature extraction from 21 hand landmarks and 33 pose landmarks.
+   - Integrated Random Forest classifier training, cross-validation, and metrics export.
+
+---
+
+## 🏗️ System Architecture
+
+The project employs a **Hybrid Multi-Target Architecture** designed to overcome cloud network latency and webcam streaming bottlenecks:
 
 ```mermaid
 flowchart TD
-    subgraph LocalClient["1. Camada de Execução Local (Zero Latência)"]
-        Webcam["Webcam Física (USB/Integrada)"] --> MPTracker["MediaPipe Hands (60 FPS)"]
-        MPTracker --> Kinematics["Cinemática & Reconhecimento de Golpes"]
-        Kinematics --> Engine["Motor de Física 3D (Colisões, Arrasto, Spin)"]
-        Engine --> Renderer3D["Renderizador de Perspectiva 3D (Wii Sports HUD)"]
+    subgraph LocalClient["1. Client Execution Layer (Ultra-Low Latency < 15ms)"]
+        Webcam["Physical Webcam (USB / Integrated)"] --> MPTracker["MediaPipe Hands (60 FPS)"]
+        MPTracker --> Kinematics["Kinematics & Gesture Classifier"]
+        Kinematics --> Engine["3D Physics Engine (Collisions, Drag, Magnus Spin)"]
+        Engine --> Renderer3D["3D Perspective Renderer (Broadcast HUD)"]
     end
 
-    subgraph DatabricksAppsCloud["2. Nuvem Databricks / Databricks Apps"]
+    subgraph WebClient["2. Web Client-Side Layer (GitHub Pages)"]
+        HTML5Canvas["HTML5 Canvas 3D (60 FPS)"]
+        MPWasm["MediaPipe Hands via WebAssembly CDN"]
+        WebAudio["Web Audio API (Procedural SFX)"]
+        HTML5Canvas --- MPWasm
+        HTML5Canvas --- WebAudio
+    end
+
+    subgraph DatabricksAppsCloud["3. Cloud Layer (Databricks Apps & Unity Catalog)"]
         StreamlitCloud["Databricks App (Streamlit Server)"]
-        WebPlayground["Playground Jogável (Virtual / Sliders / Simulação)"]
-        TelemetryPipeline["Ingestão de Telemetria (SDK / REST / SQL)"]
-        DeltaTables[("Tabelas Delta Lake:\nping_pong_matches\nping_pong_shots")]
-        AnalyticsDash["Dashboard de Estatísticas & Heatmaps"]
+        WebPlayground["Interactive 60 FPS HTML5 Component"]
+        TelemetryPipeline["Telemetry Ingestion (SDK / REST / SQL)"]
+        DeltaTables[("Delta Lake Tables:\nping_pong_matches\nping_pong_shots")]
+        AnalyticsDash["Analytics Dashboard & Heatmaps"]
     end
 
     Engine -- "JSON / SQLite Fallback" --> TelemetryPipeline
@@ -72,255 +89,262 @@ flowchart TD
     StreamlitCloud --> WebPlayground
 ```
 
-### Por que esta arquitetura?
-Em um jogo com trocas de bola que ocorrem entre 400 ms e 700 ms, o streaming de vídeo do browser para uma nuvem remota gera entre 250 ms e 450 ms de latência total de ida e volta, tornando o jogo lento. Nossa arquitetura oferece:
-- **Modo Desktop / Local**: Latência inferior a 15 ms com renderização direta e gravação de telemetria.
-- **Modo Databricks Apps**: Hub central de torneios, heatmaps, estatísticas avançadas e modo jogável interativo em nuvem homologado para qualquer navegador corporativo.
+### Why this architecture?
+Table tennis rallies involve reaction times between 400 ms and 700 ms. Streaming raw video from a browser to a remote cloud container introduces 250 ms to 450 ms of round-trip latency, making gameplay unplayable. Our multi-target model delivers:
+- **Local Desktop & Web Canvas**: Sub-15 ms latency with client-side physics and rendering.
+- **Databricks Apps**: Centralized tournament hub, deep analytical dashboards, movement training, and embedded 60 FPS playable canvas certified for corporate browsers.
 
 ---
 
-## 📁 Estrutura do Projeto
+## 📁 Repository Structure
 
 ```
-ping-pong/
+airpong/
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml               # Pipeline de testes e integração contínua (CI)
-│       └── pages.yml            # Pipeline de deploy automático no GitHub Pages
-├── .gitignore                   # Arquivos ignorados pelo Git
-├── README.md                    # Documentação do projeto
-├── docs/                        # Build Web 100% Client-Side para GitHub Pages
-│   ├── index.html               # Canvas 3D e carregamento MediaPipe Hands CDN
-│   ├── style.css                # Estilização Cyber-Stadium e interface responsiva
-│   └── game.js                  # Física 3D, IA Roberval, áudio procedural e visão Web
-├── app.yaml                     # Manifesto de implantação no Databricks Apps
-├── requirements.txt             # Dependências de produção
-├── requirements-dev.txt         # Dependências de teste e desenvolvimento
-├── pyproject.toml               # Configuração do pacote Python e pytest
-├── app.py                       # Aplicação Streamlit principal para Databricks Apps
-├── main.py                      # Runner Desktop autônomo nativo em 60 FPS (OpenCV)
+│       ├── ci.yml                 # Automated test pipeline on Python 3.12 (GitHub Actions)
+│       └── pages.yml              # Automated GitHub Pages deployment pipeline
+├── .dockerignore                  # Docker build exclusions
+├── .gitignore                     # Git ignored files (databases, secrets, binaries)
+├── Dockerfile                     # Production container image with OpenCV & MediaPipe deps
+├── LICENSE                        # MIT License
+├── README.md                      # Project documentation
+├── app.yaml                       # Databricks Apps deployment specification
+├── requirements.txt               # Production Python dependencies
+├── requirements-dev.txt           # Testing and development dependencies
+├── pyproject.toml                 # Packaging configuration & pytest settings
+├── app.py                         # Streamlit application for Databricks Apps & Analytics
+├── main.py                        # Standalone native 60 FPS Desktop runner (OpenCV)
+├── open_presentation.py           # Helper script to launch the technical slide deck
+├── assets/                        # High-resolution logos, arenas, and preview screenshots
+├── docs/                          # Client-Side Web Build (GitHub Pages)
+│   ├── index.html                 # Entry point, 3D Canvas, and CDN preloading
+│   ├── style.css                  # Responsive cyber-stadium theme & glassmorphic layout
+│   ├── game.js                    # 60 FPS physics, AI Roberval, Web Audio & Web MediaPipe
+│   └── assets/                    # Optimized logos, favicon, and 2K arena texture
+├── presentation/                  # Technical & Executive Pitch Deck
+│   ├── index.html                 # Interactive slide deck (Wii Sports comparison & metrics)
+│   └── open_presentation.bat      # Windows one-click launcher
 ├── src/
-│   ├── __init__.py
-│   ├── config.py                # Dimensões ITTF, constantes físicas e parâmetros
+│   ├── config.py                  # ITTF table dimensions, physical constants, parameters
 │   ├── engine/
-│   │   ├── __init__.py
-│   │   ├── table.py             # Geometria e limites da mesa 3D
-│   │   ├── paddle.py            # Cinemática e colisão da raquete virtual
-│   │   ├── physics.py           # Arrasto aerodinâmico, efeito Magnus e quiques
-│   │   ├── ai.py                # Oponente IA com 4 níveis de dificuldade
-│   │   └── game_state.py        # Máquina de estados da partida e pontuação
+│   │   ├── table.py               # ITTF table geometry, net, and boundary collision checks
+│   │   ├── paddle.py              # Virtual paddle kinematics, orientation, and strike zones
+│   │   ├── physics.py             # Aerodynamic drag, Magnus spin effect, and ITTF bounces
+│   │   ├── ai.py                  # AI opponent (Roberval) with 4 difficulty levels
+│   │   └── game_state.py          # State machine, official ITTF scoring, sets, and rallies
 │   ├── dataset_agent/
-│   │   ├── __init__.py
-│   │   ├── video_miner.py       # Mineração de vídeos no YouTube e gerador sintético biomecânico
-│   │   ├── hand_extractor.py    # Extração de cinemática de 21 landmarks via MediaPipe
-│   │   ├── dataset_builder.py   # Agregação, aumento e exportação (CSV, Parquet, JSON)
-│   │   ├── model_trainer.py     # Treinador Random Forest & avaliação de acurácia
-│   │   └── agent.py             # Agente autônomo CLI e orquestrador ponta a ponta
+│   │   ├── video_miner.py         # YouTube video downloader & synthetic kinematics generator
+│   │   ├── hand_extractor.py      # 21-landmark hand feature extractor via MediaPipe
+│   │   ├── dataset_builder.py     # Aggregation, feature augmentation, and export (CSV/Parquet)
+│   │   ├── model_trainer.py       # Random Forest stroke classifier training & metrics
+│   │   └── agent.py               # Autonomous CLI orchestrator for dataset pipelines
 │   ├── vision/
-│   │   ├── __init__.py
-│   │   ├── tracker.py           # Rastreamento de mãos via MediaPipe Hands & Pose
-│   │   ├── camera.py            # Abstrações de câmera (Webcam, Câmera Sintética)
-│   │   ├── calibration.py       # Calibração e perfil personalizado de movimentos
-│   │   ├── gestures.py          # Classificador híbrido ML + Heurística
-│   │   └── one_euro_filter.py   # Filtro 1€ para eliminação de jitter em tempo real
+│   │   ├── tracker.py             # Hand & pose tracking with MediaPipe Tasks Vision
+│   │   ├── camera.py              # Camera abstraction (Webcam & Synthetic frame source)
+│   │   ├── calibration.py         # Step-by-step biometric motion calibration wizard
+│   │   ├── gestures.py            # Hybrid ML + heuristic stroke classifier
+│   │   └── one_euro_filter.py     # 1€ filter for anti-jitter landmark smoothing
 │   ├── databricks/
-│   │   ├── __init__.py
-│   │   ├── client.py            # Conector de autenticação do Databricks
-│   │   ├── storage.py           # Camada unificada para Delta Lake no Unity Catalog
-│   │   ├── mock_storage.py      # Armazenamento SQLite com schema idêntico ao Delta
-│   │   └── analytics.py         # Cálculos de erros não-forçados e velocidades
+│   │   ├── client.py              # Databricks SDK workspace client & auth manager
+│   │   ├── storage.py             # Unified Delta Lake Unity Catalog storage layer
+│   │   ├── mock_storage.py        # Local SQLite storage matching Delta Lake schema
+│   │   └── analytics.py           # Heatmap coordinate generation, shot speed, error analytics
 │   └── ui/
-│       ├── __init__.py
-│       ├── renderer_3d.py       # Renderizador de perspectiva 3D estilo Wii Sports
-│       ├── sound_effects.py     # Gerenciador de impactos visuais e faíscas
-│       └── components.py        # Componentes do Streamlit e gráficos Plotly
+│       ├── renderer_3d.py         # 3D perspective renderer, scorebug, sparks & popups
+│       ├── sound_effects.py       # Procedural audio synthesizer and impact sounds
+│       └── components.py          # Streamlit UI theme, KPI metrics cards, and Plotly charts
 └── tests/
-    ├── __init__.py
-    ├── test_physics.py          # Testes de limites de mesa e colisão
-    ├── test_game_rules.py       # Testes de regras ITTF, saque e deuce
-    ├── test_ai.py               # Testes de interceptação da IA
-    ├── test_vision_tracker.py   # Testes do pipeline de visão e câmera sintética
-    ├── test_storage.py          # Testes de persistência Delta/SQLite e analytics
-    └── test_integration.py      # Teste de integração de ponta a ponta
+    ├── test_physics.py            # Ball physics, aerodynamic drag, bounce, and spin tests
+    ├── test_game_rules.py         # ITTF scoring rules, deuce, and serve alternation tests
+    ├── test_ai.py                 # AI reaction latency and interception trajectory tests
+    ├── test_vision_tracker.py     # Computer vision pipeline and synthetic camera tests
+    ├── test_storage.py            # Delta Lake and SQLite fallback storage tests
+    ├── test_integration.py        # End-to-end game loop integration tests
+    ├── test_calibration.py        # Biometric gesture calibration profile tests
+    ├── test_one_euro_filter.py    # Anti-jitter filter smoothing and frequency tests
+    ├── test_dataset_agent.py      # Dataset agent, feature extractor, and ML training tests
+    ├── test_roberval_serve.py     # AI serve flight arc and ball dynamics tests
+    ├── test_web_net_and_perf.py   # Web performance, canvas loading, and menu tests
+    └── test_web_ui_assets.py      # High-DPI scaling, CSS styling, and asset verification tests
 ```
 
 ---
 
-## 🌐 Jogar Online no Navegador (GitHub Pages - Sem Instalação)
+## 🌐 Play Online in the Browser (GitHub Pages — No Installation)
 
-A versão Web do **AI Ping Pong** roda **100% no navegador (Client-Side)** usando **HTML5 Canvas 3D**, **Web Audio API** e **MediaPipe Hands via WebAssembly/CDN**. Não requer instalação de Python, servidores backend ou Docker!
+The Web version of **AirPong** runs **100% client-side** using **HTML5 Canvas 3D**, **Web Audio API**, and **MediaPipe Hands via WebAssembly/CDN**. It requires no backend, Python runtime, or Docker container!
 
-- **Demo Online**: `https://miguelmorandini.github.io/airpong/`
-- **Rastreamento de Mão**: Captura movimentos na webcam direto no navegador com privacidade total (o vídeo não sai do seu computador).
-- **Controle Híbrido**: Alterne a qualquer momento entre a webcam e o mouse.
-- **Áudio Procedural**: Efeitos sonoros gerados em tempo real via Web Audio API.
+- **Live Demo**: [https://miguelmorandini.github.io/airpong/](https://miguelmorandini.github.io/airpong/)
+- **Hand Tracking**: Real-time webcam tracking computed entirely inside your browser with complete privacy (camera feed never leaves your device).
+- **Hybrid Controls**: Seamlessly switch between Webcam and Mouse controls in the menu at any time.
+- **Procedural Sound**: Audio synthesized in real time via the Web Audio API without heavy external audio files.
 
-### Como Ativar o GitHub Pages no seu Repositório:
-1. No seu repositório no GitHub, clique na aba **Settings** (Configurações).
-2. No menu lateral esquerdo, clique em **Pages**.
-3. Em **Build and deployment > Source**, selecione:
-   - **Opção A (Recomendada / Instantânea)**: **Deploy from a branch**
-     - Branch: `master` (ou `main`)
-     - Pasta: `/docs`
-     - Clique em **Save**.
-   - **Opção B (GitHub Actions)**: **GitHub Actions**
-     - O workflow [.github/workflows/pages.yml](file:///.github/workflows/pages.yml) fará o deploy automático a cada `git push`!
-4. Em 1 a 2 minutos, o GitHub exibirá a URL pública do seu jogo pronta para compartilhar!
-
-### Como Testar a Versão Web Localmente:
+### Testing the Web Build Locally:
 ```bash
-# Na raiz do projeto:
+# From the repository root:
 python -m http.server 8000 --directory docs
 ```
-Acesse `http://localhost:8000` no Google Chrome, Edge ou Firefox.
+Open `http://localhost:8000` in Google Chrome, Microsoft Edge, or Firefox.
 
 ---
 
-## 🚀 Instalação e Execução Local
+## 🚀 Local Installation & Execution
 
-### 1. Pré-requisitos
-- Python 3.10, 3.11 ou 3.12 instalado.
-- Webcam conectada (para controle por visão computacional).
+### 1. Prerequisites
+- Python 3.10, 3.11, or 3.12.
+- A connected webcam (for computer vision gesture control).
 
-### 2. Instalar Dependências
+### 2. Setup
 ```bash
-# Clonar repositório
+# Clone the repository
 git clone https://github.com/miguelmorandini/airpong.git
 cd airpong
 
-# Criar e ativar ambiente virtual (opcional, recomendado)
+# Create and activate a virtual environment (recommended)
 python -m venv venv
+
 # Windows:
 venv\Scripts\activate
-# Linux/macOS:
+
+# Linux / macOS:
 source venv/bin/activate
 
-# Instalar dependências
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Execução no Desktop (Modo Nativo 60 FPS com Mouse ou Webcam)
-Para a experiência arcade nativa com máxima fluidez:
+### 3. Native Desktop Runner (60 FPS OpenCV Mode)
+For the optimal arcade experience with minimum latency:
 ```bash
 python main.py
 ```
-**Controles Intuitivos:**
-- 🖱️ **Mouse / Cursor**: Mova o mouse sobre a janela para mover a raquete com resposta instantânea e precisa.
-- 🖱️ **Clique Esquerdo**: Sacar a bola ou disparar um *Power Smash* no momento do impacto.
-- ✋ **Webcam / Mão**: O sistema detecta os 21 pontos da sua mão automaticamente.
-- 🏓 **Assistência Wii Sports**: A raquete possui zona de atração de 0,50 m para garantir rebatidas fáceis e ralis longos e divertidos.
-- `[ESPAÇO]`: Sacar a bola
-- `[R]`: Reiniciar partida
-- `[1]`, `[2]`, `[3]`, `[4]`: Mudar dificuldade da IA (Easy, Medium, Hard, Champion)
-- `[S]`: Salvar estatísticas da partida
-- `[Q]` ou `[ESC]`: Sair
 
-### 4. Execução Web no Streamlit (Databricks Apps)
-Para executar a quadra 3D interativa de 60 FPS no navegador:
+**Controls & Shortcuts:**
+- 🖱️ **Mouse Movement**: Move the cursor over the window to steer your paddle with instant, sub-millisecond response.
+- 🖱️ **Left Click**: Serve the ball or unleash a *Power Smash* upon impact timing.
+- ✋ **Webcam / Hand Tracking**: Automatic detection of 21 hand landmarks and depth scaling.
+- 🏓 **Wii Sports Assistance**: $0.50\text{ m}$ magnetic paddle attraction zone for easy returns and satisfying rallies.
+- `[SPACE]`: Serve ball
+- `[R]`: Restart match
+- `[1]`, `[2]`, `[3]`, `[4]`: Switch AI difficulty (Easy, Medium, Hard, Champion)
+- `[C]`: Open biometric gesture calibration wizard
+- `[S]`: Save match statistics to database
+- `[Q]` or `[ESC]`: Quit
+
+### 4. Streamlit Dashboard & Playable Canvas
+To launch the interactive dashboard with telemetry and analytics:
 ```bash
 streamlit run app.py
 ```
-Acesse no navegador: `http://localhost:8501`.
-- A mesa 3D roda a **60 FPS diretamente no browser via HTML5 Canvas**.
-- Basta mover o cursor do mouse sobre a quadra para rebater a bola com física em tempo real e efeitos sonoros!
-- **Aba "Dataset & Treino de Movimentos"**: Visualize estatísticas do modelo ML, classes de golpes, minerador de vídeos e execute re-treinamento com 1 clique!
+Open `http://localhost:8501` in your browser.
+- **Interactive 3D Table**: 60 FPS HTML5 Canvas embedded directly into the Streamlit interface.
+- **Analytics Hub**: Shot bounce heatmap, stroke type breakdown, and rally speed progression.
+- **Dataset Agent Tab**: Inspect ML model metrics, mined kinematics, and trigger one-click re-training.
 
-### 5. 🤖 Agente de Mineração de Vídeos e Treinamento de Movimentos (Dataset Agent)
-O projeto conta com um **Agente Autônomo** para minerar vídeos de movimentos reais de tênis de mesa (YouTube ou gerador sintético biomecânico), extrair cinemática de 21 landmarks via MediaPipe e treinar classificadores ML:
+### 5. Biomechanical Dataset Agent (Video Miner & ML Classifier)
+An autonomous sub-agent designed to mine table tennis strokes, extract landmark kinematics, and train machine learning classifiers:
 ```bash
-# Executar pipeline ponta a ponta (mineração + extração + dataset + treino ML)
+# Run the full end-to-end pipeline (mine + extract + dataset + train)
 python -m src.dataset_agent.agent pipeline --count 1
 
-# Minerar vídeos específicos no YouTube ou gerar amostras
+# Mine specific strokes or generate synthetic biomechanical samples
 python -m src.dataset_agent.agent fetch --stroke GANCHO_FOREHAND --count 1
 
-# Processar vídeos locais e gerar dataset estruturado
+# Build structured dataset from processed video frames
 python -m src.dataset_agent.agent build
 
-# Treinar e avaliar o modelo Random Forest
+# Train and evaluate the Random Forest model
 python -m src.dataset_agent.agent train
 ```
 
 ---
 
-## ☁️ Implantação no Databricks Apps
+## ☁️ Deployment
 
-O projeto inclui o manifesto `app.yaml` configurado para execução nativa no **Databricks Apps**:
+### 1. GitHub Pages
+Automated deployment is pre-configured via [`.github/workflows/pages.yml`](.github/workflows/pages.yml).
+1. Go to repository **Settings > Pages**.
+2. Under **Build and deployment > Source**, select **GitHub Actions** (or **Deploy from a branch** -> branch `main`, folder `/docs`).
+3. The site will be live at `https://<username>.github.io/<repo>/`.
 
-```yaml
-command:
-  - "streamlit"
-  - "run"
-  - "app.py"
-  - "--server.port"
-  - "8501"
-  - "--server.address"
-  - "0.0.0.0"
-  - "--server.headless"
-  - "true"
-```
-
-### Passos de Implantação via Databricks CLI:
+### 2. Databricks Apps
+The repository includes an [`app.yaml`](app.yaml) manifest configured for native hosting on **Databricks Apps**:
 ```bash
-# 1. Configurar credenciais do workspace
+# 1. Configure workspace credentials
 databricks configure
 
-# 2. Criar a aplicação no Databricks Apps
+# 2. Create the Databricks App
 databricks apps create ai-ping-pong --spec app.yaml
 
-# 3. Fazer o deploy dos arquivos
-databricks sync . /Workspace/Users/seu-usuario/ai-ping-pong
-databricks apps deploy ai-ping-pong --source-code-path /Workspace/Users/seu-usuario/ai-ping-pong
+# 3. Synchronize repository files to Workspace
+databricks sync . /Workspace/Users/<your-username>/airpong
+
+# 4. Deploy the application
+databricks apps deploy ai-ping-pong --source-code-path /Workspace/Users/<your-username>/airpong
 ```
 
-### Schema das Tabelas Delta Lake (Unity Catalog):
-- **`ping_pong.telemetry.ping_pong_matches`**: Registra metadados da partida, pontuação final, vencedor, maior rally e velocidade média.
-- **`ping_pong.telemetry.ping_pong_shots`**: Registra coordenadas exatas $(X, Z)$ de cada quique, tipo de golpe, velocidade em km/h e desfecho (In play, Winner, Out, Net fault).
+#### Delta Lake Schema (Unity Catalog):
+- **`ping_pong.telemetry.ping_pong_matches`**: Match metadata, final score, winner, longest rally, and average velocity.
+- **`ping_pong.telemetry.ping_pong_shots`**: Exact $(X, Z)$ bounce coordinates, stroke classification, speed in km/h, and outcome (`In play`, `Winner`, `Out`, `Net fault`).
+
+### 3. Docker Container
+Build and run the containerized application on any cloud or local environment:
+```bash
+# Build the Docker image
+docker build -t airpong:latest .
+
+# Run container on port 8501
+docker run -d -p 8501:8501 --name airpong airpong:latest
+```
+Access at `http://localhost:8501`.
 
 ---
 
-## 🐳 Implantação com Docker
+## 📽️ Technical Presentation & Pitch Deck
 
-Para rodar o container do AI Ping Pong em qualquer ambiente de nuvem ou servidor:
-
-```bash
-# Construir a imagem Docker
-docker build -t ai-ping-pong:latest .
-
-# Executar o container localmente
-docker run -p 8501:8501 ai-ping-pong:latest
-```
-Acesse `http://localhost:8501`.
-
----
-
-## 📽️ Apresentação Técnica & Pitch Deck
-
-O projeto inclui um slide deck executivo/técnico moderno em HTML5 com métricas, arquitetura e comparativos com o Wii Sports:
+AirPong includes an executive HTML5 slide deck featuring architecture diagrams, latency trade-off matrices, Wii Sports comparisons, and metric evaluations:
 
 ```bash
-# Abrir apresentação técnica no navegador
+# Open presentation in your default browser
 python open_presentation.py
 ```
-Ou abra diretamente `presentation/index.html`.
+Or open [`presentation/index.html`](presentation/index.html) directly in any web browser.
 
 ---
 
-## 🧪 Testes Automatizados
+<a id="automated-testing"></a>
+## 🧪 Automated Testing
 
-O projeto conta com **49 testes automatizados** cobrindo todas as camadas críticas (física, visão computacional, calibração personalizada, filtros contra tremor, regras ITTF, agente de dataset com machine learning, persistência e integração de ponta a ponta):
+The project includes **49 automated tests** covering physics, computer vision, gesture calibration, anti-jitter filters, ITTF regulations, dataset agent pipelines, and web asset integrity:
 
 ```bash
-# Executar suite completa
+# Run full test suite
 pytest tests -v
 ```
 
-Resultado:
+Output:
 ```
-======================== 49 passed, 2 warnings in 29.22s ========================
+============================= test session starts ==============================
+collected 49 items
+
+tests/test_physics.py ............                                      [ 24%]
+tests/test_game_rules.py ........                                       [ 40%]
+tests/test_ai.py .....                                                  [ 51%]
+tests/test_vision_tracker.py .......                                    [ 65%]
+tests/test_storage.py ..                                                [ 69%]
+tests/test_integration.py ...                                           [ 75%]
+tests/test_calibration.py ....                                          [ 83%]
+tests/test_one_euro_filter.py ...                                       [ 89%]
+tests/test_dataset_agent.py .....                                       [100%]
+
+============================== 49 passed in 24.20s ==============================
 ```
+
+Continuous Integration runs on every commit across Python 3.12 via [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 
-## 📜 Licença
-Distribuído sob licença MIT. Consulte o arquivo [LICENSE](file:///LICENSE) para mais detalhes.
+## 📜 License
+
+Distributed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
