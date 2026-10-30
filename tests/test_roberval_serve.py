@@ -1,13 +1,22 @@
 import os
 import time
-from playwright.sync_api import sync_playwright
+import pytest
+
+playwright_module = pytest.importorskip("playwright.sync_api", reason="Playwright is required for browser E2E tests")
+sync_playwright = playwright_module.sync_playwright
 
 def test_roberval_serve():
     html_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "docs", "index.html"))
     file_url = f"file:///{html_path.replace(os.sep, '/')}"
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, channel="msedge")
+        try:
+            try:
+                browser = p.chromium.launch(headless=True)
+            except Exception:
+                browser = p.chromium.launch(headless=True, channel="msedge")
+        except Exception as e:
+            pytest.skip(f"Browser could not be launched: {e}")
         page = browser.new_page(viewport={"width": 1024, "height": 640})
 
         page.goto(file_url, wait_until="domcontentloaded")
