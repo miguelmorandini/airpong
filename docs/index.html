@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AirPong - Tênis de Mesa 3D | Copa Roberval 2026</title>
+  <meta name="description" content="AirPong: Jogo de Tênis de Mesa 3D controlado por gestos na webcam ou mouse, com IA Roberval e física oficial ITTF." />
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Preload Critical Arena & Logo Images for Instant 60 FPS Render -->
+  <link rel="preload" as="image" href="assets/background_arena.png" />
+  <link rel="preload" as="image" href="assets/airpong_logo.png" />
+  <link rel="preload" as="image" href="assets/airpong_emblem.png" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Non-blocking Defer for MediaPipe Hands & Camera Utils CDN -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas" width="1024" height="640"></canvas>
+    <!-- Hidden Video element for Webcam Feed -->
+    <video id="webcam" playsinline style="display: none;"></video>
+  </div>
+
+  <script defer src="game.js"></script>
+</body>
+</html>

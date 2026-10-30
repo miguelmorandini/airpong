@@ -6,6 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
+import numpy as np
 
 from src.config import RulesConfig
 from src.engine.physics import Ball, PhysicsEvent, PhysicsEngine
@@ -80,9 +81,17 @@ class GameStateMachine:
         self.server: str = "PLAYER"
         self.player_score: int = 0
         self.ai_score: int = 0
+        self.player_sets: int = 0
+        self.ai_sets: int = 0
+        self.set_number: int = 1
         self.current_rally_count: int = 0
         self.announcement: str = "NOVA PARTIDA CONTRA ROBERVAL! FECHE A MAO ✊ PARA INICIAR"
         self.announcement_timer: float = 4.0
+        self.serve_cooldown: float = 0.0
+        self.point_transition_timer: float = 0.0
+        self.ball_reset_pending: bool = False
+        self.last_point_winner: Optional[str] = None
+        self.last_point_reason: str = ""
 
         self.match_id = str(uuid.uuid4())
         self.stats = MatchStats(
@@ -114,6 +123,9 @@ class GameStateMachine:
         )
         self.player_score = 0
         self.ai_score = 0
+        self.player_sets = 0
+        self.ai_sets = 0
+        self.set_number = 1
         self.server = "PLAYER"
         self.current_rally_count = 0
         self.status = MatchStatus.READY
@@ -121,14 +133,36 @@ class GameStateMachine:
         self.announcement_timer = 3.5
         self._shots_speeds.clear()
         self.physics.reset_serve(self.ball, server="PLAYER")
+        self.ball_reset_pending = False
+        self.serve_cooldown = 0.0
+
+    def start_next_set(self):
+        """Start the next set of the match, preserving accumulated set score."""
+        self.set_number += 1
+        self.player_score = 0
+        self.ai_score = 0
+        self.current_rally_count = 0
+        # Alternate server at the start of each set
+        self.server = "ROBERVAL" if (self.set_number % 2 == 0) else "PLAYER"
+        self.status = MatchStatus.SERVING
+        self.physics.reset_serve(self.ball, server=self.server)
+        self.ball_reset_pending = False
+        self.serve_cooldown = 1.0  # 1.0s breath before serve starts
+        if self.server == "PLAYER":
+            self.announcement = f"SET {self.set_number}! SEU SAQUE"
+        else:
+            self.announcement = f"SET {self.set_number}! SAQUE DO ROBERVAL"
+        self.announcement_timer = 3.0
 
     def prepare_serve(self):
         """Position ball floating ready for serve."""
         self.physics.reset_serve(self.ball, server=self.server)
+        self.ball_reset_pending = False
+        self.serve_cooldown = 0.0
         self.status = MatchStatus.SERVING
         self.current_rally_count = 0
         if self.server == "PLAYER":
-            self.announcement = "BOLA PRONTA! SACAR COM O MOVIMENTO DO BRACO! 🏓"
+            self.announcement = "SEU SAQUE: GOLPEIE COM O BRACO OU CLIQUE"
             self.announcement_timer = 3.0
         else:
             self.announcement = "SAQUE DO ROBERVAL..."
@@ -141,6 +175,8 @@ class GameStateMachine:
         vy_lift: float = 0.0,
     ):
         """Hit the serve with launch dynamics based on player's physical hand/arm swing."""
+        if self.serve_cooldown > 0:
+            return  # Prevent accidental phantom strikes during point transition
         if self.status in (MatchStatus.READY, MatchStatus.SERVING):
             self.status = MatchStatus.RALLY
 
@@ -156,17 +192,23 @@ class GameStateMachine:
             # Horizontal placement towards corners
             horizontal_vx = max(-1.25, min(1.25, vx_offset * 1.9))
 
-            self.ball.x = self.player_paddle.x * 0.5
+            # Legal serve baseline position with magnetic alignment to ball
+            serve_x = float(np.clip(self.ball.x if abs(self.ball.x) > 0.01 else 0.15, -0.45, 0.45))
+            self.ball.x = serve_x
             self.ball.y = 0.28
             self.ball.z = -1.35
+            self.player_paddle.x = serve_x
+            self.player_paddle.y = 0.28
+            self.player_paddle.z = -1.38
             self.ball.vx = horizontal_vx
             self.ball.vy = vertical_vy
             self.ball.vz = forward_vz
             self.ball.in_play = True
             self.ball.is_serve = True
             self.ball.last_hitter = "PLAYER"
-            self.ball.spin_y = horizontal_vx * 6.0
-            self.ball.spin_x = vy_lift * 6.0
+            paddle_vx = getattr(self.player_paddle, "vx", 0.0)
+            self.ball.spin_y = float(np.clip(horizontal_vx * 7.0 + paddle_vx * 5.0, -12.0, 12.0))
+            self.ball.spin_x = float(np.clip(vy_lift * 6.0, -6.0, 8.0))
 
             actual_speed_kmh = self.ball.speed_kmh
             shot_desc = "POWER SERVE" if actual_speed_kmh >= 30.0 else "SAQUE"
@@ -197,14 +239,16 @@ class GameStateMachine:
                 self._execute_roberval_serve()
 
     def _execute_roberval_serve(self):
-        """Execute Roberval's serve towards player."""
+        """Execute Roberval's serve towards player with calibrated clearance."""
         self.status = MatchStatus.RALLY
         self.ball.x = -0.15
         self.ball.y = 0.28
         self.ball.z = 1.35
-        self.ball.vx = -0.2 if self.ai.rng.random() < self.ai.difficulty.corner_aim_tendency else 0.2
-        self.ball.vy = 1.80
-        self.ball.vz = -2.9
+        # Calibrated serve velocity: clears net safely (+20cm margin) and lands cleanly at z ≈ -0.50m
+        corner_dir = -0.10 if self.ai.rng.random() < 0.5 else 0.10
+        self.ball.vx = corner_dir
+        self.ball.vy = 2.15
+        self.ball.vz = -3.5
         self.ball.in_play = True
         self.ball.is_serve = True
         self.ball.last_hitter = "ROBERVAL"
@@ -229,19 +273,36 @@ class GameStateMachine:
         if self.announcement_timer > 0:
             self.announcement_timer -= dt
 
+        if self.serve_cooldown > 0:
+            self.serve_cooldown -= dt
+
         if self.status == MatchStatus.GAME_OVER:
             return
 
         if self.status == MatchStatus.SERVING:
-            # Auto serve for Roberval
+            # During point transition cooldown, let dead ball tumble naturally under gravity
+            if self.serve_cooldown > 0:
+                if self.ball_reset_pending:
+                    if self.serve_cooldown > 0.35:
+                        self.physics.step_dead_ball(self.ball, dt)
+                    else:
+                        self.physics.reset_serve(self.ball, server=self.server)
+                        self.ball_reset_pending = False
+                return
+
+            if self.ball_reset_pending:
+                self.physics.reset_serve(self.ball, server=self.server)
+                self.ball_reset_pending = False
+
+            # Auto serve for Roberval after generous ready pause
             if self.server in ("AI", "ROBERVAL"):
-                if self.announcement_timer <= 0:
+                if self.announcement_timer <= 0.2:
                     self._execute_roberval_serve()
             elif self.server == "PLAYER":
-                # Ball hovers gently at baseline waiting for player's physical swing
-                self.ball.x = self.player_paddle.x * 0.5
-                self.ball.y = 0.28 + 0.02 * math.sin(time.time() * 5.0)
-                self.ball.z = -1.35
+                # Ball hovers gently right in front of player's paddle waiting for physical swing
+                self.ball.x = self.player_paddle.x
+                self.ball.y = max(0.18, self.player_paddle.y + 0.05) + 0.015 * math.sin(time.time() * 5.0)
+                self.ball.z = self.player_paddle.z + 0.08
                 self.ball.vx = 0.0
                 self.ball.vy = 0.0
                 self.ball.vz = 0.0
@@ -273,12 +334,20 @@ class GameStateMachine:
 
             if event.hitter == "PLAYER":
                 self.stats.player_shots_count += 1
-                if event.details == "SMASH":
+                if "SMASH" in event.details:
                     self.stats.player_smashes += 1
-                    self.announcement = "SMASH!"
+                    self.announcement = f"SMASH! {event.speed_kmh:.0f} km/h"
                     self.announcement_timer = 1.0
+                elif "GANCHO" in event.details:
+                    self.announcement = f"{event.details}! {event.speed_kmh:.0f} km/h"
+                    self.announcement_timer = 0.9
+                else:
+                    self.announcement = f"BLOQUEIO! {event.speed_kmh:.0f} km/h"
+                    self.announcement_timer = 0.7
             else:
                 self.stats.ai_shots_count += 1
+                self.announcement = "REBATA!"
+                self.announcement_timer = 0.5
 
             self._shots_speeds.append(event.speed_kmh)
 
@@ -316,15 +385,23 @@ class GameStateMachine:
                 if self.ball.bounce_count_current_hit >= 2:
                     self.ball.in_play = False
                     scoring_party = "PLAYER" if event.details in ("AI", "ROBERVAL") else "ROBERVAL"
-                    self._award_point(scoring_party, "DOIS QUIQUES!")
+                    was_serve = self.ball.is_serve or (self.current_rally_count <= 1)
+                    if was_serve:
+                        desc = "ACE! DOIS QUIQUES NO SAQUE (+1)" if scoring_party == "PLAYER" else "DOIS QUIQUES NO SAQUE DO ROBERVAL"
+                    else:
+                        desc = "DOIS QUIQUES! PONTO SEU (+1)" if scoring_party == "PLAYER" else "DOIS QUIQUES! PONTO DO ROBERVAL"
+                    self._award_point(scoring_party, desc)
 
         elif event.event_type == "NET_FAULT":
             self.ball.in_play = False
             hitter = event.hitter or self.server
+            was_serve = self.ball.is_serve or (self.current_rally_count <= 1)
             if hitter == "PLAYER":
-                self._award_point("ROBERVAL", "BOLA NA REDE! PONTO DO ROBERVAL")
+                desc = "SAQUE NA REDE! PONTO DO ROBERVAL" if was_serve else "BOLA NA REDE! PONTO DO ROBERVAL"
+                self._award_point("ROBERVAL", desc)
             else:
-                self._award_point("PLAYER", "ROBERVAL NA REDE! PONTO SEU!")
+                desc = "ROBERVAL ERROU SAQUE NA REDE! PONTO SEU" if was_serve else "ROBERVAL NA REDE! PONTO SEU"
+                self._award_point("PLAYER", desc)
 
         elif event.event_type in ("NET", "NET_CLIP"):
             self.announcement = "RASPOU NA REDE!"
@@ -333,35 +410,42 @@ class GameStateMachine:
     def _evaluate_point_outcome(self):
         """When ball goes out of play, award point according to ITTF rules."""
         hitter = self.ball.last_hitter or self.server
+        was_serve = self.ball.is_serve or (self.current_rally_count <= 1)
 
         # If ball bounced on opponent's side and then went out -> Winner for the hitter!
         if hitter == "PLAYER":
             if self.ball.bounced_ai_side:
-                self._award_point("PLAYER", "WINNER POINT!")
+                desc = "ACE! PONTO DE SAQUE (+1)" if was_serve else "WINNER POINT! (+1)"
+                self._award_point("PLAYER", desc)
             else:
-                self._award_point("ROBERVAL", "FORA! PONTO DO ROBERVAL")
+                desc = "SAQUE FORA! PONTO DO ROBERVAL" if was_serve else "BOLA FORA! PONTO DO ROBERVAL"
+                self._award_point("ROBERVAL", desc)
         else:
             if self.ball.bounced_player_side:
-                self._award_point("ROBERVAL", "WINNER POINT DO ROBERVAL!")
+                desc = "ACE DO ROBERVAL! (+1)" if was_serve else "WINNER POINT DO ROBERVAL!"
+                self._award_point("ROBERVAL", desc)
             else:
-                self._award_point("PLAYER", "ROBERVAL ERROU! PONTO SEU!")
+                desc = "ROBERVAL ERROU SAQUE FORA! PONTO SEU" if was_serve else "ROBERVAL ERROU! PONTO SEU"
+                self._award_point("PLAYER", desc)
 
     def _award_point(self, winner: str, reason: str):
-        """Add point, check game over, update serve rotation."""
-        self.status = MatchStatus.POINT_SCORED
+        """Add point, check game over, update serve rotation with graceful transition."""
         self.stats.total_rallies += 1
+        self.last_point_winner = winner
+        self.last_point_reason = reason
+        self.serve_cooldown = 1.8  # 1.8s cooldown between point end and next serve
+        self.ball_reset_pending = True
 
         if winner == "PLAYER":
             self.player_score += 1
-            self.announcement = f"PONTO SEU! {reason}"
         else:
             self.ai_score += 1
-            self.announcement = f"PONTO DO ROBERVAL! {reason}"
 
-        self.announcement_timer = 2.2
+        self.announcement = reason
+        self.announcement_timer = 2.4
 
         if self.current_shot:
-            self.current_shot.result = "WINNER" if ("WINNER" in reason) else "OUT"
+            self.current_shot.result = "WINNER" if ("WINNER" in reason or "ACE" in reason) else "OUT"
 
         # Update average shot speed
         if self._shots_speeds:
@@ -380,15 +464,19 @@ class GameStateMachine:
             self.stats.ai_score = a_score
             match_winner = "PLAYER" if p_score > a_score else "ROBERVAL"
             self.stats.winner = match_winner
-            winner_display = "VOCE VENCEU" if match_winner == "PLAYER" else "ROBERVAL VENCEU"
-            self.announcement = f"FIM DE JOGO! {winner_display} ({p_score} - {a_score})!"
-            self.announcement_timer = 5.0
+            if match_winner == "PLAYER":
+                self.player_sets += 1
+            else:
+                self.ai_sets += 1
+            winner_display = "VOCE VENCEU O SET" if match_winner == "PLAYER" else "ROBERVAL VENCEU O SET"
+            self.announcement = f"{winner_display} ({p_score} - {a_score})!"
+            self.announcement_timer = 15.0
             return
 
         # Check deuce
         if p_score >= 10 and a_score >= 10:
             if p_score == a_score:
-                self.announcement += " [DEUCE / EMPATE]"
+                self.announcement += " [DEUCE]"
             elif p_score > a_score:
                 self.announcement += " [VANTAGEM VOCE]"
             else:
@@ -404,10 +492,6 @@ class GameStateMachine:
             rotation_idx = (total_points // self.rules.SERVES_PER_ROTATION) % 2
             self.server = "PLAYER" if rotation_idx == 0 else "ROBERVAL"
 
-        # Reset for next serve
-        self.prepare_serve()
-        if self.server == "PLAYER":
-            self.announcement += " | SEU SAQUE (GOLPE COM O BRACO 🏓)"
-        else:
-            self.announcement += " | SAQUE DO ROBERVAL"
-            self.announcement_timer = 2.0
+        # Set status to SERVING for tests & match flow
+        self.status = MatchStatus.SERVING
+        self.current_rally_count = 0

@@ -2,7 +2,7 @@
 
 import math
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 import numpy as np
 
 from src.config import PaddleConfig
@@ -19,11 +19,27 @@ class Paddle:
     vx: float = 0.0
     vy: float = 0.0
     vz: float = 0.0
-    tilt_x: float = 0.0  # radians
-    tilt_y: float = 0.0  # radians
-    radius: float = 0.28
+    tilt_x: float = 0.0  # radians (pitch)
+    tilt_y: float = 0.0  # radians (roll / lateral tilt)
+    roll: float = 0.0    # true wrist roll in radians
+    pitch: float = 0.0   # true blade pitch in radians
+    yaw: float = 0.0     # true blade yaw in radians
+    normal_vector: Optional[np.ndarray] = None
+    radius: float = 0.30
     depth_tolerance: float = 0.35  # Generous depth tolerance
     assisted_mode: bool = True     # Wii Sports style magnetic assist
+    is_hook_swing: bool = False    # True when physical arm/hand hook swing is active
+    hook_power: float = 1.0        # Multiplier based on physical swing velocity
+    attack_triggered: bool = False # Explicit attack motion trigger from vision/input
+    motion_assist: bool = True     # Wii Sports style magnetic trajectory alignment
+    stroke_type: Optional[str] = None # e.g. "GANCHO_FOREHAND", "GANCHO_BACKHAND", "GANCHO_SMASH"
+    hand_detected: bool = False
+    hand_speed: float = 0.0
+    arm_detected: bool = False
+    elbow_angle: float = 0.0
+    arm_power: float = 1.0
+    kinetic_phase: str = "IDLE"
+    trail: List[Tuple[float, float, float]] = field(default_factory=list)
 
     def __post_init__(self):
         self.radius = self.config.RADIUS
@@ -48,6 +64,14 @@ class Paddle:
     def normal(self) -> np.ndarray:
         """Surface normal vector of paddle face pointing towards opponent side."""
         base_dir = 1.0 if self.is_player else -1.0
+        if self.normal_vector is not None:
+            norm = np.linalg.norm(self.normal_vector)
+            if norm > 1e-6:
+                vec = self.normal_vector / norm
+                if (self.is_player and vec[2] < 0) or (not self.is_player and vec[2] > 0):
+                    vec = -vec
+                return vec
+
         # Include tilt
         nx = math.sin(self.tilt_y)
         ny = math.sin(self.tilt_x)
@@ -57,10 +81,33 @@ class Paddle:
             return np.array([nx / norm, ny / norm, nz / norm], dtype=np.float64)
         return np.array([0.0, 0.0, base_dir], dtype=np.float64)
 
-    def update_position(self, target_x: float, target_y: float, target_z: Optional[float], dt: float):
-        """Update paddle position with smoothing and compute velocity."""
+    def update_position(
+        self,
+        target_x: float,
+        target_y: float,
+        target_z: Optional[float],
+        dt: float,
+        roll: Optional[float] = None,
+        pitch: Optional[float] = None,
+        yaw: Optional[float] = None,
+        normal: Optional[Tuple[float, float, float]] = None,
+        arm_power: Optional[float] = None,
+        elbow_angle: Optional[float] = None,
+        arm_detected: Optional[bool] = None,
+        kinetic_phase: Optional[str] = None,
+    ):
+        """Update paddle position with smoothing, compute velocity and update 3D orientation & arm kinetics."""
         if dt <= 0:
             dt = 1.0 / 60.0
+
+        if arm_power is not None:
+            self.arm_power = float(arm_power)
+        if elbow_angle is not None:
+            self.elbow_angle = float(elbow_angle)
+        if arm_detected is not None:
+            self.arm_detected = bool(arm_detected)
+        if kinetic_phase is not None:
+            self.kinetic_phase = str(kinetic_phase)
 
         new_x = float(target_x)
         new_y = float(target_y)
@@ -85,9 +132,52 @@ class Paddle:
         self.vy = alpha * calc_vy + (1.0 - alpha) * self.vy
         self.vz = alpha * calc_vz + (1.0 - alpha) * self.vz
 
+        # Smooth rotational damping on blade tilt for realistic wooden paddle inertia (no jitter)
+        tilt_alpha = 0.28
+        if roll is not None and self.hand_detected:
+            self.roll = float(roll)
+            target_tilt_y = float(np.clip(roll, -0.65, 0.65))
+            self.tilt_y = tilt_alpha * target_tilt_y + (1.0 - tilt_alpha) * self.tilt_y
+        else:
+            target_tilt_y = float(np.clip(-self.vx * 0.12, -0.45, 0.45))
+            self.tilt_y = tilt_alpha * target_tilt_y + (1.0 - tilt_alpha) * self.tilt_y
+            self.roll = self.tilt_y
+
+        if pitch is not None and self.hand_detected:
+            self.pitch = float(pitch)
+            target_tilt_x = float(np.clip(pitch, -0.50, 0.50))
+            self.tilt_x = tilt_alpha * target_tilt_x + (1.0 - tilt_alpha) * self.tilt_x
+        else:
+            target_tilt_x = float(np.clip(self.vy * 0.10, -0.35, 0.35))
+            self.tilt_x = tilt_alpha * target_tilt_x + (1.0 - tilt_alpha) * self.tilt_x
+            self.pitch = self.tilt_x
+
+        if yaw is not None and self.hand_detected:
+            self.yaw = float(yaw)
+        else:
+            self.yaw = 0.0
+
+        if normal is not None and self.hand_detected:
+            self.normal_vector = np.array(normal, dtype=np.float64)
+        else:
+            self.normal_vector = None
+
         self.x = new_x
         self.y = new_y
         self.z = new_z
+
+        self.trail.append((self.x, self.y, self.z))
+        if len(self.trail) > 6:
+            self.trail.pop(0)
+
+    def get_sweet_spot_tier(self, radial_dist: float) -> Tuple[float, str]:
+        """Classify hit quality into Sweet-Spot, Clean, or Edge Graze (Eleven Table Tennis inspired)."""
+        if radial_dist <= 0.045:
+            return 1.15, "SWEET_SPOT"
+        elif radial_dist <= 0.085:
+            return 1.00, "CLEAN"
+        else:
+            return 0.85, "EDGE"
 
     def check_ball_collision(
         self,
@@ -112,10 +202,13 @@ class Paddle:
 
         # Arcade Assisted Mode (Wii Sports style) for player
         if self.assisted_mode and self.is_player:
-            # When ball is in player strike zone (Z between -1.85 and -1.15)
-            if -1.85 <= bz <= -1.15:
-                # If paddle is within assisted reach
-                if radial_dist <= self.config.ASSISTED_RADIUS and z_dist <= (self.depth_tolerance + 0.15):
+            # When ball is in player strike zone (Z between -1.90 and -0.95)
+            if -1.90 <= bz <= -0.95:
+                # If paddle is within assisted reach (expanded for table corners)
+                is_corner = abs(bx) >= 0.40
+                reach = getattr(self.config, "CORNER_ASSIST_RADIUS", 0.64) if is_corner else self.config.ASSISTED_RADIUS
+                depth_tol = self.depth_tolerance + (0.20 if is_corner else 0.15)
+                if radial_dist <= reach and z_dist <= depth_tol:
                     return True, radial_dist, z_dist
 
         return False, radial_dist, z_dist

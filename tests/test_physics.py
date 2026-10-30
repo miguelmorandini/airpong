@@ -147,3 +147,135 @@ def test_roberval_return_rebatida_physics():
     assert -4.2 <= ball.vz <= -3.0     # Reaches player baseline
     assert 1.4 <= ball.vy <= 2.0       # Natural table tennis arc (no moonball)
     assert -0.8 <= ball.vx <= 0.8      # Lands on player table
+
+
+def test_corner_shot_interception_reach():
+    """Verify corner shots are reliably intercepted with generous corner assistance."""
+    engine = PhysicsEngine()
+    player_p = Paddle(is_player=True)
+    # Player reached towards corner
+    player_p.x = -0.55
+    player_p.y = 0.20
+    player_p.z = -1.40
+    player_p.vx = -0.8
+    player_p.is_hook_swing = True
+    ai_p = Paddle(is_player=False)
+
+    ball = Ball()
+    # Ball sharply in the corner
+    ball.x = -0.68
+    ball.y = 0.22
+    ball.z = -1.30
+    ball.vx = -0.4
+    ball.vy = -0.2
+    ball.vz = -3.2
+
+    events = engine.step(ball, player_p, ai_p, dt=0.016)
+    hit_events = [e for e in events if e.event_type == "HIT"]
+    assert len(hit_events) == 1
+    assert hit_events[0].hitter == "PLAYER"
+    assert "CANTO" in hit_events[0].details
+    assert ball.vz > 0.0  # Returned towards opponent
+
+
+def test_dynamic_spin_and_magnus_effect():
+    """Verify lateral swipe imparts sidespin and curves ball, and slice imparts backspin."""
+    engine = PhysicsEngine()
+    player_p = Paddle(is_player=True)
+    player_p.x = 0.0
+    player_p.y = 0.25
+    player_p.z = -1.40
+    player_p.vx = 1.8  # Strong lateral forehand swipe
+    player_p.vy = 0.6  # Upward brush
+    player_p.is_hook_swing = True
+    ai_p = Paddle(is_player=False)
+
+    ball = Ball()
+    ball.x = 0.0
+    ball.y = 0.25
+    ball.z = -1.35
+    ball.vx = 0.0
+    ball.vy = -0.1
+    ball.vz = -3.0
+
+    events = engine.step(ball, player_p, ai_p, dt=0.016)
+    assert ball.spin_y > 4.0  # Crisp sidespin
+    assert ball.spin_x > 2.0  # Topspin
+
+    # Let the ball travel towards opponent and verify Magnus lateral curvature
+    x_start = ball.x
+    for _ in range(25):
+        engine.step(ball, player_p, ai_p, dt=0.016)
+    # Ball should have curved towards positive X due to Magnus effect
+    assert ball.x > x_start
+
+    # Now test downward slice (cortada)
+    player_p.vy = -1.2  # Downward chop
+    player_p.vx = 0.0
+    ball_slice = Ball()
+    ball_slice.x = 0.0
+    ball_slice.y = 0.25
+    ball_slice.z = -1.35
+    ball_slice.vz = -3.0
+
+    engine.step(ball_slice, player_p, ai_p, dt=0.016)
+    assert ball_slice.spin_x < -1.5  # Negative spin_x indicates backspin / slice
+
+
+def test_motion_attack_model_broad_reach():
+    """Verify that in Motion Attack Mode, an active arm swing connects even when offset from ball XY."""
+    engine = PhysicsEngine()
+    player_p = Paddle(is_player=True)
+    player_p.x = -0.35  # Paddle position on the left
+    player_p.y = 0.20
+    player_p.z = -1.40
+    player_p.vx = 0.8   # Deliberate attack swing
+    player_p.vy = 0.3
+    player_p.vz = 0.4
+    player_p.is_hook_swing = True
+    ai_p = Paddle(is_player=False)
+
+    ball = Ball()
+    ball.x = 0.25       # Ball crossing on the right (60cm away from paddle!)
+    ball.y = 0.25
+    ball.z = -1.35
+    ball.vx = 0.0
+    ball.vy = -0.2
+    ball.vz = -3.0
+
+    events = engine.step(ball, player_p, ai_p, dt=0.016)
+    hit_events = [e for e in events if e.event_type == "HIT"]
+    assert len(hit_events) == 1
+    assert hit_events[0].hitter == "PLAYER"
+
+    # Paddle should have magnetically aligned with the ball
+    assert player_p.x == pytest.approx(0.25, abs=0.05)
+    assert ball.vz > 3.0
+    assert ball.last_hitter == "PLAYER"
+
+
+def test_motion_attack_timing_strike_in_corridor():
+    """Verify that an attack swing connects while ball is in arrival corridor before paddle Z."""
+    engine = PhysicsEngine()
+    player_p = Paddle(is_player=True)
+    player_p.x = 0.0
+    player_p.y = 0.22
+    player_p.z = -1.45
+    player_p.attack_triggered = True  # Active attack trigger
+    ai_p = Paddle(is_player=False)
+
+    ball = Ball()
+    ball.x = 0.10
+    ball.y = 0.24
+    ball.z = -1.10      # 35cm in front of paddle Z!
+    ball.vx = 0.0
+    ball.vy = -0.1
+    ball.vz = -3.2
+
+    events = engine.step(ball, player_p, ai_p, dt=0.016)
+    hit_events = [e for e in events if e.event_type == "HIT"]
+    assert len(hit_events) == 1
+    assert hit_events[0].hitter == "PLAYER"
+    assert ball.vz > 3.5
+    assert ball.z > -1.10
+

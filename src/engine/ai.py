@@ -24,27 +24,27 @@ class AIDifficulty:
 DIFFICULTIES = {
     "EASY": AIDifficulty(
         name="EASY",
-        reaction_delay=0.18,
-        max_paddle_speed=2.5,
-        error_variance=0.22,
-        smash_probability=0.10,
-        corner_aim_tendency=0.20,
+        reaction_delay=0.35,
+        max_paddle_speed=1.3,
+        error_variance=0.35,
+        smash_probability=0.0,
+        corner_aim_tendency=0.0,
     ),
     "MEDIUM": AIDifficulty(
         name="MEDIUM",
         reaction_delay=0.10,
-        max_paddle_speed=3.8,
+        max_paddle_speed=3.6,
         error_variance=0.12,
-        smash_probability=0.35,
-        corner_aim_tendency=0.50,
+        smash_probability=0.30,
+        corner_aim_tendency=0.45,
     ),
     "HARD": AIDifficulty(
         name="HARD",
-        reaction_delay=0.04,
-        max_paddle_speed=5.5,
-        error_variance=0.05,
-        smash_probability=0.65,
-        corner_aim_tendency=0.80,
+        reaction_delay=0.03,
+        max_paddle_speed=5.8,
+        error_variance=0.04,
+        smash_probability=0.70,
+        corner_aim_tendency=0.85,
     ),
     "CHAMPION": AIDifficulty(
         name="CHAMPION",
@@ -73,30 +73,28 @@ class TableTennisAI:
 
     def predict_interception(self, ball: Ball) -> Tuple[float, float, float]:
         """Predict where ball will intersect AI's hitting plane (Z ~ 1.55)."""
-        # If ball is heading away or stopped, return center resting spot
+        # If ball is heading away or stopped, return center resting spot near table baseline
         if ball.vz <= 0.2 or not ball.in_play:
-            return 0.0, 0.20, 1.55
+            return 0.0, 0.18, 1.55
 
         z_strike = 1.55
         dz = z_strike - ball.z
         if dz <= 0:
-            return ball.x, max(0.05, ball.y), z_strike
+            return ball.x, max(0.08, min(0.35, ball.y)), z_strike
 
         dt_intercept = dz / ball.vz
 
-        # Simple ballistic projection for X and Y
+        # Ballistic projection for X and Y
         pred_x = ball.x + ball.vx * dt_intercept
-        # Ball may bounce on table on the way
         pred_y = ball.y + ball.vy * dt_intercept - 0.5 * 9.81 * (dt_intercept ** 2)
 
-        # Handle table bounce estimation
+        # Handle table bounce estimation: realistic apex 12cm to 26cm above table
         if pred_y < 0.05:
-            # Rebound estimate
-            pred_y = abs(pred_y) * 0.7 + 0.12
+            pred_y = min(0.26, max(0.12, 0.12 + abs(ball.vy) * 0.06))
 
-        # Clamp to realistic reach
-        pred_x = max(-0.95, min(0.95, pred_x))
-        pred_y = max(0.05, min(0.65, pred_y))
+        # Clamp to realistic player reach grounded near table surface
+        pred_x = max(-0.85, min(0.85, pred_x))
+        pred_y = max(0.08, min(0.35, pred_y))
 
         # Add difficulty-based stochastic noise
         err = self.difficulty.error_variance

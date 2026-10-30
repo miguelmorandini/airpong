@@ -140,3 +140,43 @@ def test_desktop_main_loop_simulation():
     cam_y2 = cam_y1 + ch
     scene_frame[cam_y1:cam_y2, cam_x1:cam_x2] = cam_view
     assert scene_frame.shape == (renderer.height, renderer.width, 3)
+
+
+def test_pre_game_menu_modal_and_interactions():
+    """Verify pre-game Start Menu / Lobby rendering, hitboxes, and action handling."""
+    game = GameStateMachine(difficulty="MEDIUM")
+    renderer = PerspectiveRenderer3D()
+
+    # 1. Render in menu mode without hand tracking (empty camera)
+    frame_menu = renderer.render_frame(game, track_res=None, in_menu=True)
+    assert frame_menu is not None
+    assert frame_menu.shape == (renderer.height, renderer.width, 3)
+
+    # 2. Check that all expected interactive button hitboxes are registered (3 difficulty levels: EASY, MEDIUM, HARD)
+    expected_buttons = ["start", "diff_1", "diff_2", "diff_3", "restart", "calibrate"]
+    for btn_name in expected_buttons:
+        assert btn_name in renderer.menu_buttons, f"Button {btn_name} should be in menu_buttons"
+        bx1, by1, bx2, by2 = renderer.menu_buttons[btn_name]
+        assert bx2 > bx1 and by2 > by1, f"Button {btn_name} has invalid geometry: ({bx1}, {by1}, {bx2}, {by2})"
+
+    # 3. Test clicking on the start button
+    sx1, sy1, sx2, sy2 = renderer.menu_buttons["start"]
+    click_x = int((sx1 + sx2) / 2)
+    click_y = int((sy1 + sy2) / 2)
+    assert renderer.get_menu_action_at(click_x, click_y) == "start"
+
+    # 4. Test clicking on difficulty 3 (HARD)
+    dx1, dy1, dx2, dy2 = renderer.menu_buttons["diff_3"]
+    click_dx = int((dx1 + dx2) / 2)
+    click_dy = int((dy1 + dy2) / 2)
+    assert renderer.get_menu_action_at(click_dx, click_dy) == "diff_3"
+
+    # 5. Test clicking outside any button
+    assert renderer.get_menu_action_at(5, 5) is None
+
+    # 6. Test in-game HUD Menu button click
+    hx1, hy1, hx2, hy2 = renderer.hud_menu_button
+    hud_cx = int((hx1 + hx2) / 2)
+    hud_cy = int((hy1 + hy2) / 2)
+    assert renderer.is_hud_menu_clicked(hud_cx, hud_cy) is True
+    assert renderer.is_hud_menu_clicked(900, 500) is False

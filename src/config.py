@@ -40,9 +40,11 @@ class BallConfig:
 @dataclass(frozen=True)
 class PaddleConfig:
     """Paddle geometry and collision bounds calibrated for hand-to-table interception."""
-    RADIUS: float = 0.28          # 28 cm blade radius for reliable block interception
-    ASSISTED_RADIUS: float = 0.42 # Forgiving strike reach
-    HANDLE_LENGTH: float = 0.10   # Handle length
+    RADIUS: float = 0.076         # 7.6 cm blade physical radius (15.2 cm width) - official ITTF ~10% table width ratio
+    VISUAL_RADIUS: float = 0.076  # 7.6 cm blade visual radius
+    ASSISTED_RADIUS: float = 0.12 # Active swing / swipe assist reach (12 cm)
+    CORNER_ASSIST_RADIUS: float = 0.15 # Edge of table reach (15 cm)
+    HANDLE_LENGTH: float = 0.08   # 8 cm ergonomic flared handle
     MAX_SWING_SPEED: float = 18.0 # Max registered swing speed in m/s
     PLAYER_Z_REST: float = -1.40  # Player baseline strike plane (exact table end)
     AI_Z_REST: float = 1.40       # AI opponent baseline plane
@@ -71,8 +73,8 @@ class CameraConfig:
 @dataclass(frozen=True)
 class DisplayConfig:
     """Rendering dimensions and Wii Sports palette."""
-    CANVAS_WIDTH: int = 860
-    CANVAS_HEIGHT: int = 580
+    CANVAS_WIDTH: int = 1024
+    CANVAS_HEIGHT: int = 640
     TABLE_COLOR_RGB: Tuple[int, int, int] = (16, 92, 168)      # Classic ITTF Blue
     TABLE_BORDER_RGB: Tuple[int, int, int] = (245, 245, 245)   # Crisp White
     NET_COLOR_RGB: Tuple[int, int, int] = (220, 220, 225)      # Semi-transparent mesh

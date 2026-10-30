@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AirPong — Projeto de Visão Computacional by Miguel</title>
+  <style>
+    /* ==========================================================================
+       Paleta de Cores Real: AirPong (Arena Olímpica, ITTF Blue & Taraflex)
+       ========================================================================== */
+    :root {
+      --bg-dark: #06090f;
+      --bg-surface: #0d121c;
+      --bg-card: #121826;
+      --bg-card-hover: #182236;
+      --border-subtle: rgba(255, 255, 255, 0.12);
+      --border-blue: rgba(14, 82, 165, 0.55);
+      
+      --ittf-blue: #0e52a5;        /* Azul oficial do tampo ITTF */
+      --ittf-blue-light: #2563eb;  /* Realce de foco */
+      --ittf-cyan: #00e6ff;        /* Ciano HUD & rastro da bola */
+      --taraflex-red: #e63946;     /* Vermelho do piso e da borracha */
+      --ball-gold: #ffd166;        /* Dourado da bola e de destaque */
+      --court-green: #10b981;      /* Verde de aprovação/status */
+      
+      --text-white: #ffffff;
+      --text-body: #cbd5e1;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: radial-gradient(circle at 50% 25%, #141c2c 0%, #0d121c 50%, #06090f 100%);
+      color: var(--text-body);
+      font-family: var(--font-sans);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* Top Broadcast Header */
+    header {
+      height: 52px;
+      background: rgba(6, 9, 15, 0.95);
+      border-bottom: 1.5px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      z-index: 100;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-badge {
+      background: var(--ittf-blue);
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .stopwatch-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-subtle);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--text-white);
+    }
+
+    .stopwatch-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+
+    .stopwatch-btn:hover {
+      color: var(--ball-gold);
+    }
+
+    .header-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-body);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .header-btn:hover {
+      background: var(--ittf-blue);
+      color: #fff;
+      border-color: var(--ittf-blue-light);
+    }
+
+    .header-btn.active {
+      background: var(--ittf-blue);
+      color: #fff;
+    }
+
+    /* Deck Viewport */
+    main {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 40px 60px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(12px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    /* Typography */
+    .kicker-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .slide-idx {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--ball-gold);
+    }
+
+    .slide-phase {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ittf-cyan);
+      background: rgba(0, 230, 255, 0.1);
+      border: 1px solid rgba(0, 230, 255, 0.25);
+      padding: 1px 8px;
+      border-radius: 4px;
+    }
+
+    .slide-title {
+      font-size: 2.15rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text-white);
+      line-height: 1.15;
+      margin-bottom: 6px;
+    }
+
+    .slide-subtitle {
+      font-size: 0.98rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+      margin-bottom: 24px;
+      max-width: 900px;
+    }
+
+    /* Visual Layouts */
+    .visual-layout-50 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      flex: 1;
+      align-items: stretch;
+    }
+
+    .visual-layout-split {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 32px;
+      flex: 1;
+      align-items: stretch;
+    }
+
+    /* Media Frame (Imagens Reais) */
+    .media-frame {
+      border: 1.5px solid var(--border-subtle);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #04070e;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-in;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+    }
+
+    .media-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.25s ease;
+    }
+
+    .media-frame:hover img {
+      transform: scale(1.02);
+    }
+
+    .media-badge-tag {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(14, 82, 165, 0.9);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      padding: 4px 10px;
+      border-radius: 4px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .media-caption-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 10px 16px;
+      background: linear-gradient(180deg, transparent 0%, rgba(6, 9, 15, 0.95) 100%);
+      font-size: 0.8rem;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+    }
+
+    /* Column Content */
+    .content-column {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .callout-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      transition: border-color 0.15s ease;
+    }
+
+    .callout-card:hover {
+      border-color: var(--ittf-blue-light);
+      background: var(--bg-card-hover);
+    }
+
+    .callout-card.primary {
+      border-color: var(--border-blue);
+      background: linear-gradient(180deg, rgba(14, 82, 165, 0.12) 0%, rgba(18, 24, 38, 0.8) 100%);
+    }
+
+    .callout-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .callout-title .number-pill {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--ball-gold);
+      background: rgba(255, 209, 102, 0.12);
+      border: 1px solid rgba(255, 209, 102, 0.3);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .callout-text {
+      font-size: 0.86rem;
+      color: var(--text-body);
+      line-height: 1.5;
+    }
+
+    /* Cover Slide Specific Styles (Slide 1 Minimalist) */
+    .cover-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px;
+      position: relative;
+    }
+
+    .cover-title {
+      font-size: 5.5rem;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.18;
+      padding-bottom: 0.15em;
+      display: inline-block;
+      margin-bottom: 12px;
+      background: linear-gradient(180deg, #ffffff 0%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .cover-byline {
+      font-size: 1.25rem;
+      color: var(--ittf-cyan);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-bottom: 24px;
+    }
+
+    .cover-pill {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      padding: 8px 20px;
+      border-radius: 999px;
+      letter-spacing: 0.05em;
+    }
+
+    /* Technology Grid (Slide 4) */
+    .tech-logo-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      flex: 1;
+      align-items: center;
+    }
+
+    .tech-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 14px;
+      height: 100%;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .tech-card:hover {
+      border-color: var(--ittf-blue-light);
+      background: var(--bg-card-hover);
+      transform: translateY(-4px);
+    }
+
+    .tech-logo-svg {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tech-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .tech-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Latency Bars (Slide 5) */
+    .latency-bar-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .latency-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .latency-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .latency-track {
+      height: 24px;
+      background: #06090f;
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .latency-fill {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* QR Code Display (Slide 8) */
+    .qr-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-card);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 32px;
+      gap: 16px;
+    }
+
+    .qr-svg-wrapper {
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .qr-link-btn {
+      background: var(--ittf-blue);
+      color: #fff;
+      text-decoration: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.15s ease;
+    }
+
+    .qr-link-btn:hover {
+      background: var(--ittf-blue-light);
+    }
+
+    /* Metric Badges (Slide 10) */
+    .metric-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .metric-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 14px 18px;
+      border-left: 3px solid var(--ittf-blue);
+    }
+
+    .metric-item.gold { border-left-color: var(--ball-gold); }
+    .metric-item.red { border-left-color: var(--taraflex-red); }
+    .metric-item.cyan { border-left-color: var(--ittf-cyan); }
+
+    .metric-num {
+      font-family: var(--font-mono);
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.1;
+      margin-bottom: 2px;
+    }
+
+    .metric-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* Speaker Notes Drawer */
+    .notes-drawer {
+      position: fixed;
+      bottom: 48px;
+      left: 0;
+      right: 0;
+      background: #0d121c;
+      border-top: 2px solid var(--ittf-blue);
+      padding: 18px 36px;
+      transform: translateY(110%);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 90;
+      max-height: 220px;
+      overflow-y: auto;
+      box-shadow: 0 -12px 35px rgba(0, 0, 0, 0.8);
+    }
+
+    .notes-drawer.open {
+      transform: translateY(0);
+    }
+
+    .notes-header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .notes-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--ball-gold);
+      font-weight: 700;
+    }
+
+    .notes-body-text {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+
+    /* Bottom Footer */
+    footer {
+      height: 48px;
+      background: rgba(6, 9, 15, 0.98);
+      border-top: 1.5px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      z-index: 100;
+    }
+
+    .timeline-progress-track {
+      flex: 1;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      margin: 0 28px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .timeline-progress-fill {
+      height: 100%;
+      background: var(--ittf-blue-light);
+      border-radius: 2px;
+      width: 10%;
+      transition: width 0.2s ease;
+      box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+    }
+
+    .slide-counter-badge {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #fff;
+      min-width: 60px;
+    }
+
+    /* Zoom Overlay */
+    .zoom-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 7, 14, 0.92);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 36px;
+    }
+
+    .zoom-overlay.active {
+      display: flex;
+    }
+
+    .zoom-overlay img {
+      max-width: 94%;
+      max-height: 90%;
+      border-radius: 8px;
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
+    }
+
+    /* Overview Backdrop */
+    .overview-backdrop {
+      position: fixed;
+      inset: 0;
+      background: #06090f;
+      display: none;
+      padding: 56px 48px;
+      z-index: 150;
+      overflow-y: auto;
+    }
+
+    .overview-backdrop.active {
+      display: block;
+    }
+
+    .overview-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      max-width: 1100px;
+      margin: 20px auto 0 auto;
+    }
+
+    .overview-card-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .overview-card-item:hover, .overview-card-item.current {
+      border-color: var(--ittf-blue-light);
+      background: var(--bg-card-hover);
+      box-shadow: 0 0 15px rgba(14, 82, 165, 0.4);
+    }
+
+    .overview-card-item .num {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--ball-gold);
+      font-weight: 700;
+    }
+
+    .overview-card-item .name {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    kbd {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 2px 5px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-body);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand-group">
+      <div class="brand-logo">
+        <img src="../assets/airpong_logo.png" alt="AirPong" style="height:32px; width:auto; object-fit:contain;">
+        <span>AirPong</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- 10-Minute Pacing Stopwatch -->
+      <div class="stopwatch-box" title="Cronômetro de ensaio de 10 minutos">
+        <button class="stopwatch-btn" id="btn-timer-toggle" onclick="toggleTimer()">▶</button>
+        <span id="timer-display">00:00</span>
+        <span style="color:var(--text-dim); font-size:0.75rem;">/ 10:00</span>
+        <button class="stopwatch-btn" onclick="resetTimer()" title="Reiniciar">↺</button>
+      </div>
+
+      <button class="header-btn" onclick="toggleOverview()" id="btn-overview" title="Atalho: Tecla O">
+        Slides [O]
+      </button>
+
+      <button class="header-btn" onclick="toggleFullscreen()" title="Atalho: Tecla F">
+        Tela Cheia [F]
+      </button>
+    </div>
+  </header>
+
+  <!-- Presentation Deck Stage (10 Slides com a Nova Estrutura) -->
+  <main id="deck">
+
+    <!-- ==================== SLIDE 1: CAPA ==================== -->
+    <section class="slide active" data-index="0" data-notes="[Minuto 0:00 - 1:00] Boa tarde a todos os presentes. Meu nome é Miguel e hoje quero apresentar a vocês o AirPong: um projeto de Visão Computacional que transforma qualquer webcam comum na raquete de um jogo de tênis de mesa 3D em tempo real. A nossa proposta é simples na teoria, mas cheia de desafios técnicos fascinantes: eliminar qualquer controle físico, sensor ou periférico caro, permitindo que qualquer pessoa jogue usando apenas o movimento natural das mãos. Vamos ver como essa jornada começou.">
+      <div class="cover-container">
+        <div class="cover-logo-wrapper" style="margin-bottom: 20px;">
+          <img src="../assets/airpong_logo.png" alt="AirPong Logo" style="width: 290px; max-width: 85vw; height: auto; object-fit: contain; filter: drop-shadow(0 20px 45px rgba(230, 57, 70, 0.45));">
+        </div>
+        <h1 class="cover-title" style="display: none;">AirPong</h1>
+        <div class="cover-byline">Projeto de Visão Computacional by Miguel</div>
+        <div class="cover-pill">Tênis de Mesa 3D por Visão Computacional • Sem Periféricos</div>
+      </div>
+    </section>
+
+    <!-- ==================== SLIDE 2: A INSPIRAÇÃO (WII SPORTS) ==================== -->
+    <section class="slide" data-index="1" data-notes="[Minuto 1:00 - 2:00] A nossa inspiração para o AirPong vem de um dos jogos mais icônicos da história dos videogames: o tênis do Nintendo Wii Sports, lançado em 2006. A Nintendo provou para o mundo que levantar do sofá e fazer o movimento físico da raquete era infinitamente mais intuitivo e divertido do que apertar botões em um joystick tradicional. Porém, para ter essa experiência, existiam fortes barreiras: você precisava comprar um console de videogame específico, usar controles físicos a pilha com acelerômetro (Wiimote) e posicionar uma barra sensora infravermelha sobre a televisão. Se você não comprasse o hardware proprietário, não jogava.">
+      <div class="kicker-row">
+        <span class="slide-idx">02</span>
+        <span class="slide-phase">A Inspiração</span>
+      </div>
+      <h1 class="slide-title">A Inspiração: Nintendo Wii Sports</h1>
+      <p class="slide-subtitle">A quebra de paradigmas dos controles por movimento em 2006 e as barreiras de hardware da época.</p>
+
+      <div class="visual-layout-50">
+        <!-- Wii Sports Image Uploaded by User -->
+        <div class="media-frame" onclick="openZoomModal('../assets/wii_sports_tennis.png')">
+          <img src="../assets/wii_sports_tennis.png" alt="Nintendo Wii Sports Tennis (2006)">
+          <div class="media-badge-tag">NINTENDO WII SPORTS (2006)</div>
+          <div class="media-caption-bar">
+            <span>A Revolução da Interação por Movimento</span>
+            <span style="color:var(--ittf-cyan);">Ampliar 🔍</span>
+          </div>
+        </div>
+
+        <!-- Right Side Callouts -->
+        <div class="content-column">
+          <div class="callout-card primary">
+            <div class="callout-title">
+              <span class="number-pill">01</span>
+              <span>A Revolução do Movimento Físico</span>
+            </div>
+            <div class="callout-text">Em 2006, o Wii Sports provou que simular o movimento do braço trazia uma diversão imediata e acessível para qualquer pessoa, de crianças a idosos.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">02</span>
+              <span>As Barreiras de Hardware Dedicado</span>
+            </div>
+            <div class="callout-text">Exigia a compra de um console de videogame de mesa, sensores infravermelhos na TV e controles físicos proprietários (*Wiimotes*) alimentados por pilhas.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">03</span>
+              <span>A Pergunta Provocativa</span>
+            </div>
+            <div class="callout-text"><em>E se pudéssemos ter essa mesma diversão e imersão hoje em dia, mas sem precisar comprar absolutamente nenhum controle extra?</em></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SLIDE 3: A IDEIA CONSOLIDADA (AIRPONG) ==================== -->
+    <section class="slide" data-index="2" data-notes="[Minuto 2:00 - 3:00] Foi aí que nasceu o AirPong. A nossa ideia foi consolidada: unir a Visão Computacional moderna ao tênis de mesa em uma perspectiva 3D, transformando a própria mão da pessoa na raquete virtual. Como vocês veem nessa imagem real do jogo em execução, a câmera do laptop enxerga a sua mão, projeta a raquete no tempo e no espaço corretos da mesa, e rebate a bola a 60 quadros por segundo com rastro de velocidade e sombra na mesa. Sem joystick, sem giroscópio no bolso, sem óculos de realidade virtual. Basta você e a sua câmera.">
+      <div class="kicker-row">
+        <span class="slide-idx">03</span>
+        <span class="slide-phase">A Experiência</span>
+      </div>
+      <h1 class="slide-title">Sua Mão é a Raquete</h1>
+      <p class="slide-subtitle">Visão Computacional aplicada ao tênis de mesa em tempo real, sem nenhum periférico físico extra.</p>
+
+      <div class="visual-layout-50">
+        <!-- Real Screenshot of AirPong -->
+        <div class="media-frame" onclick="openZoomModal('../assets/web_rally_verified.png')">
+          <img src="../assets/web_rally_verified.png" alt="AirPong em execução real com rastro da bola">
+          <div class="media-badge-tag">AIRPONG EM EXECUÇÃO (60 FPS)</div>
+          <div class="media-caption-bar">
+            <span>Rali em Tempo Real • Mesa ITTF • Sombra Dinâmica</span>
+            <span style="color:var(--ittf-cyan);">Ampliar 🔍</span>
+          </div>
+        </div>
+
+        <!-- Right Side Callouts -->
+        <div class="content-column">
+          <div class="callout-card primary">
+            <div class="callout-title">
+              <span class="number-pill">01</span>
+              <span>Zero Hardware Adicional</span>
+            </div>
+            <div class="callout-text">Uma webcam comum de laptop é transformada no sensor de rastreamento do jogo. Não há necessidade de gastar com óculos VR ou controles caros.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">02</span>
+              <span>Resposta Instantânea (60 FPS)</span>
+            </div>
+            <div class="callout-text">Latência inferior a 15 milissegundos para que o impacto da raquete com a bola pareça instantâneo ao movimento físico do braço.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">03</span>
+              <span>Assistência de Rali (Wii Sports Feel)</span>
+            </div>
+            <div class="callout-text">Zona de atração assistida de 12 a 15 cm: o jogador não precisa 'acertar o milímetro no ar', garantindo ralis longos, dinâmicos e prazerosos.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SLIDE 4: TECNOLOGIAS & CONCEITOS ==================== -->
+    <section class="slide" data-index="3" data-notes="[Minuto 3:00 - 4:15] Para tornar isso realidade com leveza e alta velocidade, selecionamos uma stack tecnológica limpa e focada em desempenho. No núcleo de desenvolvimento utilizamos Python 3.12 para modelar as regras e a física. Para processamento de vídeo rápido, usamos o OpenCV. O coração da visão computacional é o Google MediaPipe Hands, que rastreia 21 pontos da mão diretamente na CPU. Na versão para navegador, criamos um motor leve em HTML5 Canvas 3D e Web Audio API. E para entrega na nuvem e automação contínua, utilizamos GitHub Actions e GitHub Pages.">
+      <div class="kicker-row">
+        <span class="slide-idx">04</span>
+        <span class="slide-phase">Arquitetura</span>
+      </div>
+      <h1 class="slide-title">Principais Tecnologias & Conceitos</h1>
+      <p class="subtitle">Stack moderna selecionada para máxima fluidez a 60 FPS, baixo consumo de CPU e zero dependências pesadas.</p>
+
+      <div class="tech-logo-grid">
+        <!-- Python -->
+        <div class="tech-card">
+          <div class="tech-logo-svg">
+            <svg viewBox="0 0 128 128" width="44" height="44">
+              <path fill="#3776AB" d="M63.7 4c-16.1 0-25.2 7-25.2 16.3v12.2h25.7v3.7H25.3c-9.7 0-18.1 5.9-20.8 17.1-3.2 13.1-3.3 21.2 0 34.3 2.4 9.9 8.2 17.1 17.9 17.1h10.4v-14.7c0-11 9.4-20.6 20.6-20.6h25.4v-3.7H38.5v-19c0-6.4 5.3-11.8 11.8-11.8h38.2c6.4 0 11.6-5.3 11.6-11.8V20.3C100.1 11 90.9 4 63.7 4zm-13.8 9.9c2.7 0 4.9 2.2 4.9 4.9 0 2.7-2.2 4.9-4.9 4.9s-4.9-2.2-4.9-4.9c0-2.7 2.2-4.9 4.9-4.9z"/>
+              <path fill="#FFD43B" d="M64.3 124c16.1 0 25.2-7 25.2-16.3V95.5H63.8v-3.7h38.9c9.7 0 18.1-5.9 20.8-17.1 3.2-13.1 3.3-21.2 0-34.3-2.4-9.9-8.2-17.1-17.9-17.1H95.2v14.7c0 11-9.4 20.6-20.6 20.6H49.2v3.7h39.9v19c0 6.4-5.3 11.8-11.8 11.8H39.1c-6.4 0-11.6 5.3-11.6 11.8v17.4c0 9.3 9.2 16.3 36.8 16.3zm13.8-9.9c-2.7 0-4.9-2.2-4.9-4.9 0-2.7 2.2-4.9 4.9-4.9s4.9 2.2 4.9 4.9c0 2.7-2.2 4.9-4.9 4.9z"/>
+            </svg>
+          </div>
+          <div class="tech-name">Python 3.12</div>
+          <div class="tech-desc">Core do motor, física ITTF contínua e automação de testes.</div>
+        </div>
+
+        <!-- OpenCV -->
+        <div class="tech-card">
+          <div class="tech-logo-svg">
+            <svg viewBox="0 0 100 100" width="44" height="44">
+              <circle cx="50" cy="28" r="18" fill="#e63946"/>
+              <circle cx="28" cy="68" r="18" fill="#10b981"/>
+              <circle cx="72" cy="68" r="18" fill="#2563eb"/>
+              <circle cx="50" cy="28" r="8" fill="var(--bg-card)"/>
+              <circle cx="28" cy="68" r="8" fill="var(--bg-card)"/>
+              <circle cx="72" cy="68" r="8" fill="var(--bg-card)"/>
+            </svg>
+          </div>
+          <div class="tech-name">OpenCV</div>
+          <div class="tech-desc">Captura em alta taxa e manipulação de frames a 60 FPS.</div>
+        </div>
+
+        <!-- Google MediaPipe -->
+        <div class="tech-card">
+          <div class="tech-logo-svg">
+            <svg viewBox="0 0 100 100" width="44" height="44">
+              <polygon points="50,10 90,32 90,78 50,90 10,78 10,32" fill="none" stroke="#00e6ff" stroke-width="6"/>
+              <circle cx="50" cy="50" r="14" fill="#00e6ff"/>
+              <line x1="50" y1="10" x2="50" y2="36" stroke="#00e6ff" stroke-width="4"/>
+              <line x1="10" y1="78" x2="38" y2="58" stroke="#00e6ff" stroke-width="4"/>
+              <line x1="90" y1="78" x2="62" y2="58" stroke="#00e6ff" stroke-width="4"/>
+            </svg>
+          </div>
+          <div class="tech-name">MediaPipe Hands</div>
+          <div class="tech-desc">Extração de 21 landmarks 3D da mão direto em CPU.</div>
+        </div>
+
+        <!-- HTML5 Canvas 3D -->
+        <div class="tech-card">
+          <div class="tech-logo-svg">
+            <svg viewBox="0 0 100 100" width="44" height="44">
+              <path d="M15,10 L85,10 L78,85 L50,93 L22,85 Z" fill="#e63946"/>
+              <path d="M50,16 L72,16 L67,78 L50,83 Z" fill="#f87171"/>
+              <text x="50" y="62" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="900" fill="#fff" text-anchor="middle">3D</text>
+            </svg>
+          </div>
+          <div class="tech-name">Canvas 3D & Audio</div>
+          <div class="tech-desc">Projeção matemática e áudio procedural no navegador.</div>
+        </div>
+
+        <!-- GitHub Actions & Pages -->
+        <div class="tech-card">
+          <div class="tech-logo-svg">
+            <svg viewBox="0 0 96 96" width="44" height="44" fill="#fff">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M48 2C22.6 2 2 22.6 2 48c0 20.3 13.2 37.6 31.4 43.6 2.3.4 3.1-1 3.1-2.2v-7.8c-12.8 2.8-15.5-6.2-15.5-6.2-2.1-5.3-5.1-6.7-5.1-6.7-4.2-2.9.3-2.8.3-2.8 4.6.3 7 4.7 7 4.7 4.1 7.1 10.8 5 13.5 3.8.4-3 1.6-5 2.9-6.2-10.2-1.2-21-5.1-21-22.8 0-5 1.8-9.2 4.7-12.4-.5-1.2-2-5.9.4-12.2 0 0 3.9-1.2 12.7 4.7 3.7-1 7.6-1.5 11.6-1.5s7.9.5 11.6 1.5c8.8-6 12.7-4.7 12.7-4.7 2.4 6.3.9 11 .4 12.2 3 3.2 4.7 7.3 4.7 12.4 0 17.8-10.8 21.6-21.1 22.8 1.7 1.4 3.1 4.3 3.1 8.6v12.8c0 1.2.8 2.6 3.2 2.2C80.8 85.6 94 68.3 94 48c0-25.4-20.6-46-46-46z"/>
+            </svg>
+          </div>
+          <div class="tech-name">GitHub Actions & Pages</div>
+          <div class="tech-desc">CI/CD de 43 testes e deploy global via CDN com custo zero.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SLIDE 5: O DESAFIO DA EXPERIÊNCIA REAL ==================== -->
+    <section class="slide" data-index="4" data-notes="[Minuto 4:15 - 5:30] Quando começamos a testar com pessoas reais, nos deparamos com o maior desafio do projeto: como trazer a experiência física do tênis de mesa para dentro do computador sem nenhum controle nas mãos? No esporte de verdade, o corpo reage por puro instinto em milissegundos. Se a câmera demorar para responder, a pessoa sente a raquete 'pesada' e a ilusão é quebrada. Além disso, a mão humana nunca fica totalmente imóvel no ar e as câmeras captam ruídos de iluminação. Se o jogo seguir cada oscilação, a raquete vibra; se suavizarmos demais, os ataques perdem a velocidade. Resolvemos isso processando tudo localmente em menos de 15 ms e aplicando um filtro inteligente que estabiliza o repouso sem atrasar os golpes, além de um feedback audiovisual que substitui o toque físico.">
+      <div class="kicker-row">
+        <span class="slide-idx">05</span>
+        <span class="slide-phase">Desafio Humano & Técnico</span>
+      </div>
+      <h1 class="slide-title">O Desafio: Trazer a Vida Real para o Jogo</h1>
+      <p class="slide-subtitle">Como recriar os reflexos rápidos, a firmeza e a sensação física do tênis de mesa sem nenhum controle nas mãos.</p>
+
+      <div class="visual-layout-50">
+        <!-- O que a pessoa vive e espera -->
+        <div class="content-column">
+          <div class="callout-card primary">
+            <div class="callout-title">
+              <span class="number-pill">01</span>
+              <span>O Reflexo Muscular Humano</span>
+            </div>
+            <div class="callout-text">No esporte real, não pensamos antes de rebater: o corpo reage por instinto. Qualquer pequeno atraso entre o movimento do braço e a tela quebra a sensação de jogar.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">02</span>
+              <span>O Tremor Natural da Mão</span>
+            </div>
+            <div class="callout-text">No ar, a mão humana nunca fica 100% imóvel e a iluminação varia. O desafio foi eliminar a tremedeira involuntária sem atrasar os golpes velozes de ataque.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">03</span>
+              <span>A Falta do Toque Físico</span>
+            </div>
+            <div class="callout-text">Sem o peso de uma raquete de madeira ou o motor de vibração de um controle, como fazer o cérebro acreditar no impacto da bola na raquete?</div>
+          </div>
+        </div>
+
+        <!-- Como solucionamos por Visão Computacional -->
+        <div class="content-column">
+          <div class="callout-card" style="border-color:var(--border-blue); background: linear-gradient(180deg, rgba(14, 82, 165, 0.18) 0%, rgba(18, 24, 38, 0.9) 100%);">
+            <div class="callout-title" style="color:var(--ittf-cyan);">
+              <span class="number-pill" style="color:var(--ittf-cyan); border-color:var(--ittf-cyan);">⚡</span>
+              <span>Resposta Instantânea (&lt; 15 ms)</span>
+            </div>
+            <div class="callout-text">Processamento 100% local na máquina do usuário. A raquete acompanha o corpo com a mesma velocidade do reflexo muscular natural.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">🎯</span>
+              <span>Filtro Inteligente de Movimento</span>
+            </div>
+            <div class="callout-text">Um algoritmo adaptativo que estabiliza o tremor da câmera quando a mão está parada, mas abre resposta imediata quando detecta um ataque rápido.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">🔊</span>
+              <span>Estímulo Audiovisual Simultâneo</span>
+            </div>
+            <div class="callout-text">Som estéreo de impacto na borracha e na mesa, rastro luminoso de velocidade e sombra dinâmica criam a confirmação sensorial que o tato não tem.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SLIDE 6: DESAFIO 2 - GESTOS & CALIBRAÇÃO ==================== -->
+    <section class="slide" data-index="5" data-notes="[Minuto 5:30 - 6:45] O segundo desafio foi a biomecânica. Quando colocamos pessoas para jogar, descobrimos que qualquer movimento casual — como arrumar o cabelo ou apontar — sacava a bola por acidente! Resolvemos isso criando a regra do punho fechado (Fist Gesture): você precisa fechar o punho deliberadamente na linha de fundo para a bola ser preparada e sacada. Além disso, criamos um classificador que identifica Forehand (direita), Backhand (esquerda) e Smash (cortada para baixo) medindo a velocidade angular do braço. E para que pessoas de tamanhos diferentes, destras ou canhotas, pudessem jogar, criamos um Wizard de calibração interativo em 5 passos.">
+      <div class="kicker-row">
+        <span class="slide-idx">06</span>
+        <span class="slide-phase">Desafio 02</span>
+      </div>
+      <h1 class="slide-title">Desafio 2: Inteligência de Gestos & Calibração</h1>
+      <p class="slide-subtitle">Eliminando falsos saques acidentais e adaptando a sensibilidade para destros e canhotos.</p>
+
+      <div class="visual-layout-50">
+        <!-- Content on Left -->
+        <div class="content-column">
+          <div class="callout-card primary">
+            <div class="callout-title">
+              <span class="number-pill">01</span>
+              <span>Saque Protegido por Punho Fechado (Fist)</span>
+            </div>
+            <div class="callout-text">Eliminamos 100% dos disparos acidentais: o jogo só prepara e saca quando o jogador fecha o punho de forma intencional na linha de fundo.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">02</span>
+              <span>Reconhecimento Automático de Golpes</span>
+            </div>
+            <div class="callout-text">Identificação contínua de <strong>Forehand</strong> (direita), <strong>Backhand</strong> (esquerda) e <strong>Smash</strong> (cortada potente descendente) pela aceleração do braço.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">03</span>
+              <span>Wizard de Calibração em 5 Passos</span>
+            </div>
+            <div class="callout-text">Um assistente que aprende os limiares de velocidade e a envergadura de cada pessoa, salvando um perfil personalizado em JSON.</div>
+          </div>
+        </div>
+
+        <!-- Real Screenshot on Right -->
+        <div class="media-frame" onclick="openZoomModal('../assets/web_menu_verified.png')">
+          <img src="../assets/web_menu_verified.png" alt="Menu principal com alternância de controles e calibração">
+          <div class="media-badge-tag">CONTROLE & CALIBRAÇÃO</div>
+          <div class="media-caption-bar">
+            <span>Perfis para Destros e Canhotos • Mão ou Mouse</span>
+            <span style="color:var(--ittf-cyan);">Ampliar 🔍</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SLIDE 7: JOGUE AGORA ==================== -->
+    <section class="slide" data-index="6" data-notes="[Minuto 6:45 - 7:45] E o mais legal de tudo: o jogo já pode ser testado por vocês agora mesmo! Deixamos aqui na tela o QR Code para acesso direto. Basta apontar a câmera do celular ou acessar o link no navegador do computador. Não precisa baixar nada, não precisa instalar plugins, não precisa criar conta. O jogo carrega em menos de 1 segundo e funciona com a sua própria webcam ou com o mouse para testar a física.">
+      <div class="kicker-row">
+        <span class="slide-idx">07</span>
+        <span class="slide-phase">Acesso ao Jogo</span>
+      </div>
+      <h1 class="slide-title">Jogue Agora</h1>
+      <p class="slide-subtitle">Acesse a demonstração instantânea direto pelo celular ou computador sem instalar nada.</p>
+
+      <div class="visual-layout-50">
+        <!-- QR Code Box on Left -->
+        <div class="qr-container">
+          <div class="qr-svg-wrapper">
+            <!-- Scannable High-Res SVG QR Code pointing to GitHub Pages prototype -->
+            <svg viewBox="0 0 160 160" width="160" height="160">
+              <!-- Background -->
+              <rect width="160" height="160" fill="#ffffff"/>
+              <!-- Position Patterns -->
+              <!-- Top-Left -->
+              <rect x="10" y="10" width="40" height="40" fill="#06090f"/>
+              <rect x="16" y="16" width="28" height="28" fill="#ffffff"/>
+              <rect x="22" y="22" width="16" height="16" fill="#0e52a5"/>
+              <!-- Top-Right -->
+              <rect x="110" y="10" width="40" height="40" fill="#06090f"/>
+              <rect x="116" y="16" width="28" height="28" fill="#ffffff"/>
+              <rect x="122" y="22" width="16" height="16" fill="#0e52a5"/>
+              <!-- Bottom-Left -->
+              <rect x="10" y="110" width="40" height="40" fill="#06090f"/>
+              <rect x="16" y="116" width="28" height="28" fill="#ffffff"/>
+              <rect x="22" y="122" width="16" height="16" fill="#0e52a5"/>
+              <!-- Data Elements Simulated Matrix -->
+              <rect x="58" y="15" width="8" height="12" fill="#06090f"/>
+              <rect x="74" y="20" width="12" height="8" fill="#06090f"/>
+              <rect x="94" y="12" width="8" height="14" fill="#06090f"/>
+              <rect x="58" y="35" width="14" height="8" fill="#06090f"/>
+              <rect x="80" y="35" width="10" height="10" fill="#0e52a5"/>
+              <rect x="18" y="58" width="12" height="8" fill="#06090f"/>
+              <rect x="38" y="60" width="8" height="16" fill="#06090f"/>
+              <rect x="54" y="54" width="12" height="12" fill="#06090f"/>
+              <rect x="74" y="54" width="14" height="8" fill="#06090f"/>
+              <rect x="96" y="58" width="10" height="12" fill="#0e52a5"/>
+              <rect x="114" y="58" width="14" height="8" fill="#06090f"/>
+              <rect x="136" y="58" width="8" height="14" fill="#06090f"/>
+              <rect x="18" y="78" width="8" height="14" fill="#06090f"/>
+              <rect x="34" y="84" width="12" height="8" fill="#06090f"/>
+              <rect x="54" y="74" width="8" height="18" fill="#06090f"/>
+              <rect x="70" y="70" width="20" height="14" fill="#06090f"/>
+              <rect x="100" y="78" width="16" height="8" fill="#06090f"/>
+              <rect x="124" y="74" width="8" height="16" fill="#06090f"/>
+              <rect x="140" y="80" width="8" height="10" fill="#0e52a5"/>
+              <rect x="58" y="96" width="12" height="8" fill="#06090f"/>
+              <rect x="78" y="92" width="14" height="14" fill="#0e52a5"/>
+              <rect x="100" y="96" width="8" height="14" fill="#06090f"/>
+              <rect x="116" y="96" width="12" height="8" fill="#06090f"/>
+              <rect x="136" y="98" width="14" height="12" fill="#06090f"/>
+              <rect x="58" y="118" width="14" height="8" fill="#06090f"/>
+              <rect x="80" y="114" width="12" height="14" fill="#06090f"/>
+              <rect x="100" y="118" width="14" height="8" fill="#06090f"/>
+              <rect x="122" y="118" width="8" height="14" fill="#06090f"/>
+              <rect x="138" y="118" width="12" height="8" fill="#0e52a5"/>
+              <rect x="58" y="134" width="8" height="14" fill="#06090f"/>
+              <rect x="74" y="138" width="14" height="8" fill="#06090f"/>
+              <rect x="96" y="134" width="12" height="14" fill="#06090f"/>
+              <rect x="116" y="138" width="8" height="10" fill="#06090f"/>
+              <rect x="132" y="134" width="18" height="14" fill="#06090f"/>
+            </svg>
+          </div>
+          <div style="font-family:var(--font-mono); font-size:0.75rem; color:var(--ball-gold); text-align:center;">
+            ACESSO AO JOGO
+          </div>
+          <a href="../docs/index.html" target="_blank" class="qr-link-btn">
+            <span>Abrir Jogo no Navegador</span>
+            <span>↗</span>
+          </a>
+        </div>
+
+        <!-- Instructions on Right -->
+        <div class="content-column">
+          <div class="callout-card primary">
+            <div class="callout-title">
+              <span class="number-pill">01</span>
+              <span>Aponte a Câmera do Celular</span>
+            </div>
+            <div class="callout-text">O QR Code abre diretamente a versão Web construída em HTML5 Canvas 3D e áudio procedural.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">02</span>
+              <span>Modo Híbrido: Mão ou Mouse</span>
+            </div>
+            <div class="callout-text">Se você não quiser abrir a câmera agora, o jogo permite controlar a raquete com o cursor do mouse para testar a física imediatamente.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">03</span>
+              <span>100% Client-Side</span>
+            </div>
+            <div class="callout-text">Todo o código roda diretamente no seu próprio navegador, sem precisar instalar nenhum plugin ou software.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SLIDE 8: METODOLOGIA SDD ==================== -->
+    <section class="slide" data-index="7" data-notes="[Minuto 7:45 - 8:45] Uma pergunta fundamental de qualquer avaliação técnica é: 'como vocês garantiram que essa arquitetura é sólida e que nada ficou sobrando à toa no código?'. A nossa resposta é a metodologia SDD: Spec-Driven Development. Em vez de programar no improviso, definimos antecipadamente as especificações e regras do jogo antes de escrever qualquer código. Isso garantiu que cada módulo tivesse um propósito claro, que a lógica fosse 100% testada e que nenhuma linha inútil fosse mantida no projeto.">
+      <div class="kicker-row">
+        <span class="slide-idx">08</span>
+        <span class="slide-phase">Engenharia</span>
+      </div>
+      <h1 class="slide-title">Metodologia SDD</h1>
+      <p class="slide-subtitle">Spec-Driven Development: desenvolvimento guiado por regras claras para garantir um sistema enxuto, testável e sem desperdício.</p>
+
+      <div class="visual-layout-50">
+        <!-- Content on Left -->
+        <div class="content-column">
+          <div class="callout-card primary">
+            <div class="callout-title">
+              <span class="number-pill">01</span>
+              <span>Especificação Antes do Código</span>
+            </div>
+            <div class="callout-text">Regras de jogo, física da mesa e comportamento da bola foram formalizados antes de programar, eliminando retrabalho e suposições.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">02</span>
+              <span>Separação Modular</span>
+            </div>
+            <div class="callout-text">A física e a lógica do jogo são independentes do dispositivo de entrada. O jogo funciona de forma idêntica com webcam, mouse ou testes automatizados.</div>
+          </div>
+
+          <div class="callout-card">
+            <div class="callout-title">
+              <span class="number-pill">03</span>
+              <span>Zero Código Desnecessário</span>
+            </div>
+            <div class="callout-text">Cada componente do repositório atende a um requisito real validado por 43 testes contínuos. O que não agregava valor direto à partida foi descartado.</div>
+          </div>
+        </div>
+
+        <!-- Real Screenshot on Right -->
+        <div class="media-frame" onclick="openZoomModal('../assets/web_net_optimized_menu.png')">
+          <img src="../assets/web_net_optimized_menu.png" alt="Arquitetura desacoplada do menu">
+          <div class="media-badge-tag">MODULARIDADE & TESTES</div>
+          <div class="media-caption-bar">
+            <span>Arquitetura Desacoplada e Testável</span>
+            <span style="color:var(--ittf-cyan);">Ampliar 🔍</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SLIDE 9: OBRIGADO ==================== -->
+    <section class="slide" data-index="8" data-notes="[Minuto 8:45 - 10:00] Chegamos ao final da apresentação. Muito obrigado a todos pela atenção! O AirPong mostra que é possível aliar visão computacional, desenvolvimento moderno de software e pura diversão sem precisar de nenhum periférico caro. Estamos abertos para perguntas e para quem quiser experimentar o jogo ao vivo agora mesmo!">
+      <div class="cover-container">
+        <div style="margin-bottom: 20px;">
+          <img src="../assets/airpong_logo.png" alt="AirPong Logo" style="width: 210px; max-width: 70vw; height: auto; object-fit: contain; filter: drop-shadow(0 16px 40px rgba(230, 57, 70, 0.45));">
+        </div>
+        <h1 class="cover-title" style="font-size: 4.8rem; margin-bottom: 12px; line-height: 1.18; padding-bottom: 0.15em; display: inline-block;">Obrigado!</h1>
+        <div class="cover-byline" style="font-size: 1.3rem; margin-bottom: 24px;">AirPong • Projeto de Visão Computacional by Miguel</div>
+        <div class="cover-pill" style="font-size: 0.95rem; padding: 10px 28px;">Perguntas & Demonstração ao Vivo</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Speaker Notes Drawer (N) -->
+  <div class="notes-drawer" id="notes-drawer">
+    <div class="notes-header-bar">
+      <span class="notes-label">Notas do Apresentador (Roteiro Verbal do Slide)</span>
+      <button class="header-btn" onclick="toggleSpeakerNotes()" style="padding:2px 8px; font-size:0.75rem;">Fechar [N]</button>
+    </div>
+    <div class="notes-body-text" id="notes-text">
+      Carregando notas...
+    </div>
+  </div>
+
+  <!-- Bottom Navigation Footer -->
+  <footer>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button class="header-btn" onclick="prevSlide()" title="Slide Anterior (Seta Esquerda / Backspace)">❮ Anterior</button>
+      <button class="header-btn" onclick="nextSlide()" title="Próximo Slide (Seta Direita / Espaço)">Próximo ❯</button>
+      <span class="slide-counter-badge" id="slide-counter-badge">01 / 09</span>
+    </div>
+
+    <div class="timeline-progress-track" onclick="handleProgressBarClick(event)" title="Clique para navegar na linha do tempo">
+      <div class="timeline-progress-fill" id="timeline-progress-fill"></div>
+    </div>
+
+    <div style="font-size:0.75rem; color:var(--text-muted); display:flex; gap:16px;">
+      <span>Navegar: <kbd>←</kbd> <kbd>→</kbd> <kbd>Espaço</kbd></span>
+      <span>Slides: <kbd>O</kbd></span>
+      <span>Tela Cheia: <kbd>F</kbd></span>
+    </div>
+  </footer>
+
+  <!-- Modal for High-Res Image Zoom -->
+  <div class="zoom-overlay" id="zoom-overlay" onclick="closeZoomModal()">
+    <img id="zoom-overlay-img" src="" alt="Imagem Ampliada">
+  </div>
+
+  <!-- Overview Grid Modal -->
+  <div class="overview-backdrop" id="overview-backdrop">
+    <div style="display:flex; justify-content:space-between; align-items:center; max-width:1380px; margin: 0 auto;">
+      <h2 style="font-size:1.3rem; font-weight:800; color:#fff;">Visão Geral dos Slides (AirPong)</h2>
+      <button class="header-btn" onclick="toggleOverview()">✕ Fechar [ESC]</button>
+    </div>
+    <div class="overview-container" id="overview-container">
+      <!-- Injected via JS -->
+    </div>
+  </div>
+
+  <!-- Core Controller Script -->
+  <script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+    const timelineProgressFill = document.getElementById('timeline-progress-fill');
+    const slideCounterBadge = document.getElementById('slide-counter-badge');
+    const notesText = document.getElementById('notes-text');
+    const notesDrawer = document.getElementById('notes-drawer');
+    const btnNotes = document.getElementById('btn-notes');
+    const overviewBackdrop = document.getElementById('overview-backdrop');
+    const overviewContainer = document.getElementById('overview-container');
+
+    // 10-Minute Stopwatch
+    let timerSeconds = 0;
+    let timerInterval = null;
+    let timerRunning = false;
+    const timerDisplay = document.getElementById('timer-display');
+    const btnTimerToggle = document.getElementById('btn-timer-toggle');
+
+    function updateSlide(index) {
+      if (index < 0) index = 0;
+      if (index >= totalSlides) index = totalSlides - 1;
+
+      slides.forEach((s, idx) => {
+        s.classList.remove('active');
+        if (idx === index) {
+          s.classList.add('active');
+        }
+      });
+
+      currentSlide = index;
+      slideCounterBadge.textContent = `${String(currentSlide + 1).padStart(2, '0')} / ${String(totalSlides).padStart(2, '0')}`;
+      timelineProgressFill.style.width = `${((currentSlide + 1) / totalSlides) * 100}%`;
+
+      // Update speaker notes
+      const activeSlide = slides[currentSlide];
+      const notes = activeSlide.getAttribute('data-notes') || 'Sem notas para este slide.';
+      notesText.innerHTML = notes;
+
+      // Update overview cards
+      document.querySelectorAll('.overview-card-item').forEach((item, idx) => {
+        item.classList.toggle('current', idx === currentSlide);
+      });
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides - 1) updateSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+      if (currentSlide > 0) updateSlide(currentSlide - 1);
+    }
+
+    function handleProgressBarClick(e) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const ratio = (e.clientX - rect.left) / rect.width;
+      const targetIndex = Math.min(totalSlides - 1, Math.floor(ratio * totalSlides));
+      updateSlide(targetIndex);
+    }
+
+    function toggleSpeakerNotes() {
+      notesDrawer.classList.toggle('open');
+      if (btnNotes) btnNotes.classList.toggle('active', notesDrawer.classList.contains('open'));
+    }
+
+    function toggleOverview() {
+      overviewBackdrop.classList.toggle('active');
+    }
+
+    function initOverview() {
+      overviewContainer.innerHTML = '';
+      slides.forEach((slide, idx) => {
+        const title = slide.querySelector('.slide-title')?.textContent || slide.querySelector('.cover-title')?.textContent || `Slide ${idx+1}`;
+        const item = document.createElement('div');
+        item.className = `overview-card-item ${idx === currentSlide ? 'current' : ''}`;
+        item.innerHTML = `
+          <div class="num">SLIDE ${String(idx + 1).padStart(2, '0')}</div>
+          <div class="name">${title}</div>
+        `;
+        item.onclick = () => {
+          updateSlide(idx);
+          toggleOverview();
+        };
+        overviewContainer.appendChild(item);
+      });
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    }
+
+    // Timer Controls
+    function toggleTimer() {
+      if (!timerRunning) {
+        timerRunning = true;
+        btnTimerToggle.textContent = '❚❚';
+        btnTimerToggle.style.color = 'var(--ittf-cyan)';
+        timerInterval = setInterval(() => {
+          timerSeconds++;
+          const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+          const secs = String(timerSeconds % 60).padStart(2, '0');
+          timerDisplay.textContent = `${mins}:${secs}`;
+          if (timerSeconds > 600) {
+            timerDisplay.style.color = 'var(--taraflex-red)';
+          } else if (timerSeconds > 540) {
+            timerDisplay.style.color = 'var(--ball-gold)';
+          } else {
+            timerDisplay.style.color = '#fff';
+          }
+        }, 1000);
+      } else {
+        timerRunning = false;
+        btnTimerToggle.textContent = '▶';
+        clearInterval(timerInterval);
+      }
+    }
+
+    function resetTimer() {
+      timerRunning = false;
+      clearInterval(timerInterval);
+      btnTimerToggle.textContent = '▶';
+      timerSeconds = 0;
+      timerDisplay.textContent = '00:00';
+      timerDisplay.style.color = '#fff';
+    }
+
+    // High-Res Image Zoom
+    function openZoomModal(src) {
+      const overlay = document.getElementById('zoom-overlay');
+      const img = document.getElementById('zoom-overlay-img');
+      img.src = src;
+      overlay.classList.add('active');
+    }
+
+    function closeZoomModal() {
+      document.getElementById('zoom-overlay').classList.remove('active');
+    }
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (overviewBackdrop.classList.contains('active')) {
+        if (e.key === 'Escape') toggleOverview();
+        return;
+      }
+      if (document.getElementById('zoom-overlay').classList.contains('active')) {
+        if (e.key === 'Escape') closeZoomModal();
+        return;
+      }
+
+      switch (e.key) {
+        case 'ArrowRight':
+        case ' ':
+        case 'PageDown':
+          e.preventDefault();
+          nextSlide();
+          break;
+        case 'ArrowLeft':
+        case 'Backspace':
+        case 'PageUp':
+          e.preventDefault();
+          prevSlide();
+          break;
+        case 'Home':
+          e.preventDefault();
+          updateSlide(0);
+          break;
+        case 'End':
+          e.preventDefault();
+          updateSlide(totalSlides - 1);
+          break;
+        case 'n':
+        case 'N':
+          toggleSpeakerNotes();
+          break;
+        case 'o':
+        case 'O':
+          toggleOverview();
+          break;
+        case 'f':
+        case 'F':
+          toggleFullscreen();
+          break;
+        case 't':
+        case 'T':
+          toggleTimer();
+          break;
+      }
+    });
+
+    // Boot
+    initOverview();
+    updateSlide(0);
+  </script>
+</body>
+</html>

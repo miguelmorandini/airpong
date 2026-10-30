@@ -30,15 +30,18 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Databricks
+# Databricks & Secrets
 .databricks/
 databricks_token.txt
+.env
+*.env
 
-# Local Game Data
+# Local Game Data & Models
 data/
 *.sqlite3
 *.db
 matches_local.json
+user_calibration.json
 *.task
 
 # IDE & OS
@@ -48,3 +51,6 @@ matches_local.json
 *.swo
 .DS_Store
 Thumbs.db
+
+# Agent skills cache
+.agents/
