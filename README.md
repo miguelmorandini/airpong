@@ -18,7 +18,11 @@ It also features a **100% client-side Web build** that runs at 60 FPS directly i
 
 ## 🎥 Gameplay & Computer Vision Demo
 
-![AirPong Computer Vision & 3D Gameplay](assets/airpong_cv_demo.jpg)
+<video src="assets/airpong.mp4" controls muted autoplay loop playsinline width="100%" poster="assets/airpong_cv_demo.jpg">
+  Your browser does not support the video tag.
+</video>
+
+▶️ [Watch / Download Gameplay Demo (MP4)](assets/airpong.mp4)
 
 ---
 
