@@ -16,6 +16,14 @@ It also features a **100% client-side Web build** that runs at 60 FPS directly i
 
 ---
 
+## 🎥 Gameplay & Computer Vision Demo
+
+[![AirPong Gameplay Demo](assets/web_gameplay_verified.png)](assets/airpong_gameplay_capture.mp4)
+
+> [▶ Watch Gameplay Capture (MP4)](assets/airpong_gameplay_capture.mp4)
+
+---
+
 ## 🌟 Key Features
 
 1. **Computer Vision & Gesture Control (MediaPipe Hands & OpenCV)**:
@@ -115,16 +123,12 @@ airpong/
 ├── pyproject.toml                 # Packaging configuration & pytest settings
 ├── app.py                         # Streamlit application for Databricks Apps & Analytics
 ├── main.py                        # Standalone native 60 FPS Desktop runner (OpenCV)
-├── open_presentation.py           # Helper script to launch the technical slide deck
 ├── assets/                        # High-resolution logos, arenas, and preview screenshots
 ├── docs/                          # Client-Side Web Build (GitHub Pages)
 │   ├── index.html                 # Entry point, 3D Canvas, and CDN preloading
 │   ├── style.css                  # Responsive cyber-stadium theme & glassmorphic layout
 │   ├── game.js                    # 60 FPS physics, AI Roberval, Web Audio & Web MediaPipe
 │   └── assets/                    # Optimized logos, favicon, and 2K arena texture
-├── presentation/                  # Technical & Executive Pitch Deck
-│   ├── index.html                 # Interactive slide deck (Wii Sports comparison & metrics)
-│   └── open_presentation.bat      # Windows one-click launcher
 ├── src/
 │   ├── config.py                  # ITTF table dimensions, physical constants, parameters
 │   ├── engine/
@@ -298,18 +302,6 @@ docker build -t airpong:latest .
 docker run -d -p 8501:8501 --name airpong airpong:latest
 ```
 Access at `http://localhost:8501`.
-
----
-
-## 📽️ Technical Presentation & Pitch Deck
-
-AirPong includes an executive HTML5 slide deck featuring architecture diagrams, latency trade-off matrices, Wii Sports comparisons, and metric evaluations:
-
-```bash
-# Open presentation in your default browser
-python open_presentation.py
-```
-Or open [`presentation/index.html`](presentation/index.html) directly in any web browser.
 
 ---
 
